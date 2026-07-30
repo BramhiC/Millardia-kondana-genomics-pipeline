@@ -14,7 +14,7 @@ This repository contains the analysis workflow to use for whole-genome populatio
 - **RR** — Raireshwar
 - **MEL** — *Millardia meltada* (comparative population)
 
-Illumina whole-genome sequencing data were generated for all individuals. Because no reference genome is currently available for *M. kondana*, reads were mapped to the **Rattus rattus** reference genome.
+Once Illumina whole-genome sequencing data is generated for all individuals. Because no reference genome is currently available for *M. kondana*, reads will be mapped to the **Rattus rattus** reference genome.
 
 ---
 
@@ -190,27 +190,3 @@ Final filtered VCF
 - ROH BED files
 - Window-based heterozygosity
 
----
-
-# Data flow
-
-```text
-BAM files
- ├── ANGSD → PCAngsd / NGSadmix / FST / Diversity
- ├── ROHan → Inbreeding / ROH
- └── bcftools → Filtered VCF → GONE / FEIMS
-```
-
----
-
-# Notes
-
-- The workflow is designed for **moderate-coverage Illumina whole-genome data** from a **non-model species**.
-- Genotype-likelihood approaches (ANGSD, ROHan) are preferred over hard-genotype methods where appropriate.
-- Exact FEIMS command syntax may vary depending on the installed version.
-
----
-
-# Citation
-
-If this pipeline is used in publications or derivative analyses, please cite the relevant software packages and the associated thesis or manuscript describing the *Millardia kondana* dataset.
