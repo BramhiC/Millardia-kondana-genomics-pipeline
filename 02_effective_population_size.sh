@@ -40,6 +40,7 @@ for sample in K1 K2 K3 K4
 do
   generate_multihetsep.py ${sample}.fq > ${sample}.multihetsep.txt
 done
+* generate_multihetsep.py ${sample}.fq is MSMC preprocessing
 
 
 #====================================================
