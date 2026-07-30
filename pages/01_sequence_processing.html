@@ -11,27 +11,25 @@
 <h1>Sequence Processing</h1>
 
 <p>
-This section describes the workflow used to process raw Illumina paired-end
+This section describes the preprocessing workflow used for Illumina paired-end
 whole-genome sequencing data of Millardia kondana and Millardia meltada.
 The final outputs are cleaned, duplicate-marked BAM files and a filtered SNP
-dataset for downstream population genomic analyses.
+dataset for downstream analyses.
 </p>
 
 <hr>
 
 <h2>Input data</h2>
 
-<p>Samples are organized using the following naming scheme:</p>
-
 <ul>
   <li>K1–K25: Sinhagad</li>
   <li>R1–R25: Rajgad</li>
   <li>T1–T25: Torna</li>
   <li>RR1–RR20: Raireshwar</li>
-  <li>MEL1–MEL10: M. meltada</li>
+  <li>MEL1–MEL10: Millardia meltada</li>
 </ul>
 
-<p>Each sample contains paired-end FASTQ files:</p>
+<p>Each sample contains paired-end FASTQ files.</p>
 
 <pre><code>K1_R1.fastq.gz
 K1_R2.fastq.gz
@@ -49,15 +47,9 @@ conda install -c bioconda fastqc multiqc fastp bwa-mem2 samtools bcftools gatk4 
 
 <p>
 This creates a dedicated conda environment and installs all software required
-for read processing, mapping, duplicate marking and variant calling.
+for quality control, trimming, read mapping, duplicate marking and variant
+calling.
 </p>
-
-<h3>What to expect</h3>
-
-<ul>
-  <li>A new conda environment named <code>mkondana_wgs</code></li>
-  <li>All required tools available in the terminal</li>
-</ul>
 
 <hr>
 
@@ -79,8 +71,8 @@ for read processing, mapping, duplicate marking and variant calling.
 </code></pre>
 
 <p>
-This structure separates raw data, intermediate files and final outputs,
-making the analysis easier to manage and reproduce.
+Keeping raw data, intermediate files and final outputs in separate directories
+helps maintain a reproducible workflow.
 </p>
 
 <hr>
@@ -99,14 +91,14 @@ EOF
 </code></pre>
 
 <p>
-This file stores the sample name, population and species for each individual.
-It is used by several downstream scripts to automatically process all samples.
+This file stores the sample name, population and species information and is
+used by several downstream scripts.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>A tab-separated file named <code>sample_metadata.tsv</code></li>
+  <li><code>sample_metadata.tsv</code></li>
 </ul>
 
 <hr>
@@ -157,8 +149,7 @@ done
 
 <p>
 This script removes Illumina adapter sequences and trims low-quality bases from
-both paired-end reads. Cleaned reads are written to the <code>trimmed/</code>
-directory.
+both paired-end reads.
 </p>
 
 <h3>What to expect</h3>
@@ -184,8 +175,8 @@ multiqc fastqc_trimmed -o multiqc_trimmed
 </code></pre>
 
 <p>
-This confirms that trimming successfully removed adapters and improved read
-quality before read mapping.
+This confirms that trimming improved read quality and removed most adapter
+contamination.
 </p>
 
 <h3>What to expect</h3>
@@ -193,7 +184,6 @@ quality before read mapping.
 <ul>
   <li>Improved per-base quality scores</li>
   <li>Minimal adapter warnings</li>
-  <li>Trimmed reads ready for mapping</li>
 </ul>
 
 <hr>
@@ -217,8 +207,7 @@ cd ..
 </code></pre>
 
 <p>
-The Rattus rattus reference genome is indexed for BWA, SAMtools and GATK so it
-can be used for mapping and variant calling.
+The Rattus rattus reference genome is indexed for BWA, SAMtools and GATK.
 </p>
 
 <h3>What to expect</h3>
@@ -231,7 +220,7 @@ can be used for mapping and variant calling.
 
 <hr>
 
-<h2>Step 6: Read mapping with BWA-MEM2</h2>
+<h2>Step 6: Read mapping</h2>
 
 <pre><code>mkdir -p alignment
 
@@ -247,16 +236,15 @@ done
 </code></pre>
 
 <p>
-Trimmed reads are aligned to the reference genome. This determines the genomic
-position of each read.
+Trimmed reads are aligned to the reference genome to determine their genomic
+positions.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
   <li>One SAM file per sample</li>
-  <li>Mapping rates typically >80%</li>
-  <li>Lower mapping may occur because a related-species reference is used</li>
+  <li>Mapping rates typically above ~80%</li>
 </ul>
 
 <hr>
@@ -278,14 +266,14 @@ done
 
 <p>
 SAM files are converted into compressed BAM format and sorted by genomic
-position, which is required for duplicate marking and variant calling.
+position.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
   <li>Sorted BAM file</li>
-  <li>BAM index file (.bai)</li>
+  <li>BAM index file</li>
 </ul>
 
 <hr>
@@ -306,8 +294,7 @@ done
 </code></pre>
 
 <p>
-PCR duplicates are marked so that they do not inflate read counts or bias
-variant calling. Duplicates are marked, not removed.
+PCR duplicates are marked so that they do not bias variant calling.
 </p>
 
 <h3>What to expect</h3>
@@ -315,7 +302,7 @@ variant calling. Duplicates are marked, not removed.
 <ul>
   <li>Duplicate-marked BAM file</li>
   <li>Duplicate metrics file</li>
-  <li>Indexed BAM</li>
+  <li>Indexed BAM file</li>
 </ul>
 
 <hr>
@@ -334,7 +321,7 @@ done
 
 <p>
 These statistics are used to evaluate mapping quality, properly paired reads
-and duplicate levels for each sample.
+and duplicate levels.
 </p>
 
 <h3>What to expect</h3>
@@ -357,15 +344,13 @@ done
 </code></pre>
 
 <p>
-Mean sequencing depth is calculated for each sample. Coverage is later used to
-identify the best samples for PSMC.
+Mean sequencing depth is calculated for each sample.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
   <li>One mean coverage file per sample</li>
-  <li>Coverage values typically around 10–15× for this dataset</li>
 </ul>
 
 <hr>
@@ -383,7 +368,7 @@ variant calling.
 <h3>What to expect</h3>
 
 <ul>
-  <li>A text file listing all BAM files</li>
+  <li><code>bamlist.txt</code></li>
 </ul>
 
 <hr>
@@ -400,16 +385,15 @@ bcftools mpileup \
 -Q 20 \
 -a AD,DP | \
 bcftools call \
--m -v -Ou | \
-bcftools norm -f reference/Rrattus.fa -Oz \
+-m -v -Oz \
 -o variants/variants.raw.vcf.gz
 
 bcftools index variants/variants.raw.vcf.gz
 </code></pre>
 
 <p>
-Variants are called jointly across all samples. Joint calling improves
-consistency when identifying shared and population-specific variants.
+Variants are called jointly across all samples to identify shared and
+population-specific variants consistently.
 </p>
 
 <h3>What to expect</h3>
@@ -429,13 +413,13 @@ variants/variants.raw.vcf.gz \
 </code></pre>
 
 <p>
-INDELs are removed because the downstream analyses in this pipeline use SNPs.
+INDELs are removed because downstream analyses in this pipeline use SNPs.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>SNP-only VCF file</li>
+  <li>SNP-only VCF</li>
 </ul>
 
 <hr>
@@ -474,7 +458,7 @@ structure analyses.
 <h3>What to expect</h3>
 
 <ul>
-  <li>Commoner and more reliable SNP set</li>
+  <li>More reliable SNP set</li>
 </ul>
 
 <hr>
@@ -490,7 +474,6 @@ bcftools index variants/variants.filtered.vcf.gz
 
 <p>
 Variants showing strong deviation from Hardy–Weinberg equilibrium are removed.
-This helps reduce problematic sites and potential genotyping errors.
 </p>
 
 <h3>What to expect</h3>
@@ -517,8 +500,8 @@ variants/variants.filtered.vcf.gz.csi
 </code></pre>
 
 <p>
-The BAM files are used for ANGSD, ROHan and PSMC, while the filtered VCF is
-used for PCAngsd, NGSadmix, FEIMS and GONE.
+The BAM files are used for ANGSD, ROHan and PSMC. The filtered VCF is used for
+PCAngsd, NGSadmix, FEIMS and GONE.
 </p>
 
 <p><a href="index.html">← Back to Home</a></p>
