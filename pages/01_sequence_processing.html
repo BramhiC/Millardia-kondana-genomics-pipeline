@@ -11,31 +11,27 @@
 <h1>Sequence Processing</h1>
 
 <p>
-This section describes the preprocessing workflow used for Illumina paired-end
+This section describes the workflow used to process raw Illumina paired-end
 whole-genome sequencing data of Millardia kondana and Millardia meltada.
-The aim is to convert raw FASTQ files into high-quality, duplicate-marked,
-indexed BAM files and a filtered SNP dataset for downstream population genomic
-analyses.
+The final outputs are cleaned, duplicate-marked BAM files and a filtered SNP
+dataset for downstream population genomic analyses.
 </p>
 
-<h2>Input Data</h2>
+<hr>
 
-<p>
-The dataset contains four plateau populations of M. kondana and one comparison
-population of M. meltada.
-</p>
+<h2>Input data</h2>
+
+<p>Samples are organized using the following naming scheme:</p>
 
 <ul>
-  <li>Sinhagad: K1–K25</li>
-  <li>Rajgad: R1–R25</li>
-  <li>Torna: T1–T25</li>
-  <li>Raireshwar: RR1–RR20</li>
-  <li>M. meltada: MEL1–MEL10</li>
+  <li>K1–K25: Sinhagad</li>
+  <li>R1–R25: Rajgad</li>
+  <li>T1–T25: Torna</li>
+  <li>RR1–RR20: Raireshwar</li>
+  <li>MEL1–MEL10: M. meltada</li>
 </ul>
 
-<p>
-Each sample consists of paired-end Illumina reads.
-</p>
+<p>Each sample contains paired-end FASTQ files:</p>
 
 <pre><code>K1_R1.fastq.gz
 K1_R2.fastq.gz
@@ -43,11 +39,7 @@ K1_R2.fastq.gz
 
 <hr>
 
-<h2>Software Installation</h2>
-
-<p>
-The analysis was performed in a dedicated conda environment.
-</p>
+<h2>Software installation</h2>
 
 <pre><code>conda create -n mkondana_wgs -y
 conda activate mkondana_wgs
@@ -56,18 +48,20 @@ conda install -c bioconda fastqc multiqc fastp bwa-mem2 samtools bcftools gatk4 
 </code></pre>
 
 <p>
-This installs all software required for read processing, mapping, duplicate
-marking and variant calling.
+This creates a dedicated conda environment and installs all software required
+for read processing, mapping, duplicate marking and variant calling.
 </p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>A new conda environment named <code>mkondana_wgs</code></li>
+  <li>All required tools available in the terminal</li>
+</ul>
 
 <hr>
 
-<h2>Project Structure</h2>
-
-<p>
-Organizing files into separate directories helps keep the workflow reproducible
-and prevents intermediate files from becoming mixed with final outputs.
-</p>
+<h2>Project structure</h2>
 
 <pre><code>project/
 ├── raw_fastq/
@@ -84,56 +78,70 @@ and prevents intermediate files from becoming mixed with final outputs.
 └── scripts/
 </code></pre>
 
+<p>
+This structure separates raw data, intermediate files and final outputs,
+making the analysis easier to manage and reproduce.
+</p>
+
 <hr>
 
-<h2>Step 1: Quality Assessment of Raw Reads</h2>
+<h2>Step 1: Create sample metadata</h2>
+
+<pre><code>cat > sample_metadata.tsv << EOF
+sample	population	species
+K1	Sinhagad	M_kondana
+K2	Sinhagad	M_kondana
+R1	Rajgad	M_kondana
+T1	Torna	M_kondana
+RR1	Raireshwar	M_kondana
+MEL1	Meltada	M_meltada
+EOF
+</code></pre>
 
 <p>
-Before any processing, the quality of the raw sequencing reads is checked using
-FastQC. This helps identify adapter contamination, low-quality bases, abnormal
-GC content and other sequencing issues.
+This file stores the sample name, population and species for each individual.
+It is used by several downstream scripts to automatically process all samples.
 </p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>A tab-separated file named <code>sample_metadata.tsv</code></li>
+</ul>
+
+<hr>
+
+<h2>Step 2: Quality check of raw reads</h2>
 
 <pre><code>mkdir -p fastqc_raw
 
 fastqc raw_fastq/*.fastq.gz \
 -o fastqc_raw \
 -t 16
+
+multiqc fastqc_raw -o multiqc_raw
 </code></pre>
 
 <p>
-Because there are many samples, MultiQC is used to combine all FastQC reports
-into a single summary.
+FastQC examines read quality, adapter contamination, GC content and other
+sequencing metrics. MultiQC combines all FastQC reports into a single summary.
 </p>
-
-<pre><code>multiqc fastqc_raw -o multiqc_raw
-</code></pre>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>Most bases should have quality scores above Q30.</li>
-  <li>Adapter contamination may be present at read ends.</li>
-  <li>Per-base quality often decreases slightly toward the 3′ end.</li>
+  <li>One FastQC report per FASTQ file</li>
+  <li>A combined MultiQC report</li>
+  <li>Identification of adapter contamination or low-quality regions</li>
 </ul>
-
-<p>
-The MultiQC report is used to decide whether trimming is required.
-</p>
 
 <hr>
 
-<h2>Step 2: Adapter and Quality Trimming</h2>
-
-<p>
-Illumina reads can contain residual adapter sequences and low-quality bases.
-These can reduce mapping accuracy and increase false variant calls. fastp is
-used to trim adapters and filter poor-quality regions.
-</p>
+<h2>Step 3: Adapter and quality trimming</h2>
 
 <pre><code>mkdir -p trimmed
 
-for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   fastp \
     -i raw_fastq/${sample}_R1.fastq.gz \
@@ -148,33 +156,23 @@ done
 </code></pre>
 
 <p>
-The same command is repeated for all samples.
+This script removes Illumina adapter sequences and trims low-quality bases from
+both paired-end reads. Cleaned reads are written to the <code>trimmed/</code>
+directory.
 </p>
-
-<h3>What files are produced</h3>
-
-<ul>
-  <li>Trimmed paired FASTQ files</li>
-  <li>HTML report for each sample</li>
-  <li>JSON summary for each sample</li>
-</ul>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>Adapter content should decrease substantially.</li>
-  <li>Average read quality should improve.</li>
-  <li>A small fraction of reads may be removed.</li>
+  <li>Trimmed paired FASTQ files</li>
+  <li>One HTML report per sample</li>
+  <li>Reduced adapter contamination</li>
+  <li>Improved overall read quality</li>
 </ul>
 
 <hr>
 
-<h2>Step 3: Quality Check After Trimming</h2>
-
-<p>
-FastQC is run again to confirm that trimming improved the data and that no
-major quality problems remain.
-</p>
+<h2>Step 4: Quality check after trimming</h2>
 
 <pre><code>mkdir -p fastqc_trimmed
 
@@ -185,50 +183,43 @@ fastqc trimmed/*.fastq.gz \
 multiqc fastqc_trimmed -o multiqc_trimmed
 </code></pre>
 
+<p>
+This confirms that trimming successfully removed adapters and improved read
+quality before read mapping.
+</p>
+
 <h3>What to expect</h3>
 
 <ul>
-  <li>Adapter warnings should largely disappear.</li>
-  <li>Per-base quality should remain high across most of the read.</li>
-  <li>These trimmed FASTQ files are used for mapping.</li>
+  <li>Improved per-base quality scores</li>
+  <li>Minimal adapter warnings</li>
+  <li>Trimmed reads ready for mapping</li>
 </ul>
 
 <hr>
 
-<h2>Step 4: Prepare the Reference Genome</h2>
-
-<p>
-Because M. kondana does not currently have a species-specific reference genome,
-reads are aligned to the Rattus rattus reference genome.
-</p>
-
-<p>
-Download the reference genome and place it in the <code>reference/</code> directory.
-</p>
+<h2>Step 5: Prepare the reference genome</h2>
 
 <pre><code>mkdir -p reference
 cd reference
-</code></pre>
 
-<p>
-Reference file:
-</p>
+# Place Rrattus.fa in this directory
 
-<pre><code>Rrattus.fa
-</code></pre>
-
-<p>
-The reference must be indexed for BWA, SAMtools and GATK.
-</p>
-
-<pre><code>bwa-mem2 index Rrattus.fa
+bwa-mem2 index Rrattus.fa
 
 samtools faidx Rrattus.fa
 
 gatk CreateSequenceDictionary \
 -R Rrattus.fa \
 -O Rrattus.dict
+
+cd ..
 </code></pre>
+
+<p>
+The Rattus rattus reference genome is indexed for BWA, SAMtools and GATK so it
+can be used for mapping and variant calling.
+</p>
 
 <h3>What to expect</h3>
 
@@ -238,22 +229,13 @@ gatk CreateSequenceDictionary \
   <li><code>Rrattus.dict</code></li>
 </ul>
 
-<p>
-These files are required for mapping and variant calling.
-</p>
-
 <hr>
 
-<h2>Step 5: Read Mapping</h2>
-
-<p>
-Trimmed reads are aligned to the reference genome using BWA-MEM2. This step
-determines where each read most likely originated in the genome.
-</p>
+<h2>Step 6: Read mapping with BWA-MEM2</h2>
 
 <pre><code>mkdir -p alignment
 
-for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   bwa-mem2 mem \
     -t 16 \
@@ -264,27 +246,26 @@ do
 done
 </code></pre>
 
+<p>
+Trimmed reads are aligned to the reference genome. This determines the genomic
+position of each read.
+</p>
+
 <h3>What to expect</h3>
 
 <ul>
-  <li>One SAM file per sample.</li>
-  <li>Mapping rates should generally be above ~80%.</li>
-  <li>Lower mapping may occur because a related species reference is being used.</li>
+  <li>One SAM file per sample</li>
+  <li>Mapping rates typically >80%</li>
+  <li>Lower mapping may occur because a related-species reference is used</li>
 </ul>
 
 <hr>
 
-<h2>Step 6: Convert and Sort BAM Files</h2>
-
-<p>
-SAM files are large text files. They are converted into compressed BAM format
-and sorted by genomic position, which is required for duplicate marking and
-variant calling.
-</p>
+<h2>Step 7: Convert and sort BAM files</h2>
 
 <pre><code>mkdir -p bam
 
-for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   samtools sort \
     -@ 16 \
@@ -295,6 +276,11 @@ do
 done
 </code></pre>
 
+<p>
+SAM files are converted into compressed BAM format and sorted by genomic
+position, which is required for duplicate marking and variant calling.
+</p>
+
 <h3>What to expect</h3>
 
 <ul>
@@ -304,16 +290,11 @@ done
 
 <hr>
 
-<h2>Step 7: Mark PCR Duplicates</h2>
-
-<p>
-PCR amplification during library preparation can produce duplicate reads.
-These are marked so that they do not bias variant calling.
-</p>
+<h2>Step 8: Mark PCR duplicates</h2>
 
 <pre><code>mkdir -p stats
 
-for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   gatk MarkDuplicates \
     -I bam/${sample}.sorted.bam \
@@ -324,6 +305,11 @@ do
 done
 </code></pre>
 
+<p>
+PCR duplicates are marked so that they do not inflate read counts or bias
+variant calling. Duplicates are marked, not removed.
+</p>
+
 <h3>What to expect</h3>
 
 <ul>
@@ -332,19 +318,11 @@ done
   <li>Indexed BAM</li>
 </ul>
 
-<p>
-The duplicate-marked BAM is the version used for downstream analyses.
-</p>
-
 <hr>
 
-<h2>Step 8: Alignment Statistics</h2>
+<h2>Step 9: Alignment statistics</h2>
 
-<p>
-Basic mapping statistics are generated to evaluate the quality of each alignment.
-</p>
-
-<pre><code>for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+<pre><code>for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   samtools flagstat bam/${sample}.dedup.bam \
     > stats/${sample}.flagstat
@@ -354,25 +332,23 @@ do
 done
 </code></pre>
 
-<h3>Check for</h3>
+<p>
+These statistics are used to evaluate mapping quality, properly paired reads
+and duplicate levels for each sample.
+</p>
+
+<h3>What to expect</h3>
 
 <ul>
-  <li>Total mapped reads</li>
-  <li>Properly paired reads</li>
-  <li>Duplicate percentage</li>
-  <li>Overall alignment quality</li>
+  <li>Flagstat summary per sample</li>
+  <li>Detailed alignment statistics per sample</li>
 </ul>
 
 <hr>
 
-<h2>Step 9: Mean Coverage Estimation</h2>
+<h2>Step 10: Mean coverage estimation</h2>
 
-<p>
-Coverage is calculated to determine whether samples have sufficient depth for
-population genomic analyses and PSMC.
-</p>
-
-<pre><code>for sample in K1 K2 K3 R1 R2 T1 RR1 MEL1
+<pre><code>for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
 do
   samtools depth -a bam/${sample}.dedup.bam | \
   awk '{sum+=$3} END {print sum/NR}' \
@@ -380,32 +356,39 @@ do
 done
 </code></pre>
 
+<p>
+Mean sequencing depth is calculated for each sample. Coverage is later used to
+identify the best samples for PSMC.
+</p>
+
 <h3>What to expect</h3>
 
 <ul>
-  <li>Mean coverage for each sample.</li>
-  <li>Samples with the highest coverage can later be selected for PSMC.</li>
+  <li>One mean coverage file per sample</li>
+  <li>Coverage values typically around 10–15× for this dataset</li>
 </ul>
 
 <hr>
 
-<h2>Step 10: Create BAM List</h2>
-
-<p>
-A text file containing all BAM paths is created for joint variant calling.
-</p>
+<h2>Step 11: Create BAM list</h2>
 
 <pre><code>ls bam/*.dedup.bam > bamlist.txt
 </code></pre>
 
+<p>
+This file contains the paths to all cleaned BAM files and is used for joint
+variant calling.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>A text file listing all BAM files</li>
+</ul>
+
 <hr>
 
-<h2>Step 11: Joint Variant Calling</h2>
-
-<p>
-Variants are called across all samples together using bcftools. Joint calling
-helps identify shared and population-specific variants consistently.
-</p>
+<h2>Step 12: Joint variant calling</h2>
 
 <pre><code>mkdir -p variants
 
@@ -420,78 +403,106 @@ bcftools call \
 -m -v -Ou | \
 bcftools norm -f reference/Rrattus.fa -Oz \
 -o variants/variants.raw.vcf.gz
+
+bcftools index variants/variants.raw.vcf.gz
 </code></pre>
 
-<pre><code>bcftools index variants/variants.raw.vcf.gz
-</code></pre>
+<p>
+Variants are called jointly across all samples. Joint calling improves
+consistency when identifying shared and population-specific variants.
+</p>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>Raw VCF containing SNPs and INDELs.</li>
-  <li>This dataset still contains low-quality and rare variants.</li>
+  <li>Raw VCF containing SNPs and INDELs</li>
+  <li>Indexed compressed VCF</li>
 </ul>
 
 <hr>
 
-<h2>Step 12: Retain SNPs Only</h2>
-
-<p>
-INDELs are removed because the downstream analyses in this pipeline use SNPs.
-</p>
+<h2>Step 13: Retain SNPs only</h2>
 
 <pre><code>bcftools view -v snps \
 variants/variants.raw.vcf.gz \
 -Oz -o variants/variants.snps.vcf.gz
 </code></pre>
 
+<p>
+INDELs are removed because the downstream analyses in this pipeline use SNPs.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>SNP-only VCF file</li>
+</ul>
+
 <hr>
 
-<h2>Step 13: Quality Filtering</h2>
-
-<p>
-Variants with low confidence are removed using a minimum QUAL score of 20.
-</p>
+<h2>Step 14: Filter by variant quality</h2>
 
 <pre><code>bcftools filter -i 'QUAL>20' \
 variants/variants.snps.vcf.gz \
 -Oz -o variants/variants.qual20.vcf.gz
 </code></pre>
 
+<p>
+Low-confidence variants are removed using a minimum QUAL score of 20.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>Reduced number of low-quality variants</li>
+</ul>
+
 <hr>
 
-<h2>Step 14: Remove Rare Variants</h2>
-
-<p>
-Variants with very low allele counts can be unreliable and may add noise to
-population structure analyses. A minimum minor allele count (MAC) of 3 is used.
-</p>
+<h2>Step 15: Remove rare variants (MAC > 3)</h2>
 
 <pre><code>bcftools view -i 'MAC>3' \
 variants/variants.qual20.vcf.gz \
 -Oz -o variants/variants.mac3.vcf.gz
 </code></pre>
 
+<p>
+Variants with very low allele counts are removed to reduce noise in population
+structure analyses.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>Commoner and more reliable SNP set</li>
+</ul>
+
 <hr>
 
-<h2>Step 15: Hardy–Weinberg Filtering</h2>
-
-<p>
-Variants with strong deviation from Hardy–Weinberg equilibrium are removed.
-This helps reduce potential genotyping errors and problematic sites.
-</p>
+<h2>Step 16: Hardy–Weinberg filtering</h2>
 
 <pre><code>bcftools +fill-tags variants/variants.mac3.vcf.gz -- -t HWE | \
 bcftools view -i 'HWE>0.05' \
 -Oz -o variants/variants.filtered.vcf.gz
+
+bcftools index variants/variants.filtered.vcf.gz
 </code></pre>
 
-<pre><code>bcftools index variants/variants.filtered.vcf.gz
-</code></pre>
+<p>
+Variants showing strong deviation from Hardy–Weinberg equilibrium are removed.
+This helps reduce problematic sites and potential genotyping errors.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>Final filtered SNP dataset</li>
+  <li>Indexed compressed VCF</li>
+</ul>
 
 <hr>
 
-<h2>Final Outputs</h2>
+<h2>Final outputs</h2>
 
 <h3>Cleaned BAM files</h3>
 
@@ -505,44 +516,10 @@ bam/K1.dedup.bam.bai
 variants/variants.filtered.vcf.gz.csi
 </code></pre>
 
-<hr>
-
-<h2>Downstream Use</h2>
-
-<table border="1" cellpadding="6" cellspacing="0">
-<tr>
-  <th>Analysis</th>
-  <th>Input</th>
-</tr>
-<tr>
-  <td>PCAngsd</td>
-  <td>Filtered VCF / Beagle file</td>
-</tr>
-<tr>
-  <td>NGSadmix</td>
-  <td>Filtered VCF / Beagle file</td>
-</tr>
-<tr>
-  <td>FEIMS</td>
-  <td>Filtered VCF</td>
-</tr>
-<tr>
-  <td>ANGSD</td>
-  <td>Cleaned BAM files</td>
-</tr>
-<tr>
-  <td>ROHan</td>
-  <td>Individual BAM files</td>
-</tr>
-<tr>
-  <td>PSMC</td>
-  <td>High-coverage BAM files</td>
-</tr>
-<tr>
-  <td>GONE</td>
-  <td>Filtered SNP set</td>
-</tr>
-</table>
+<p>
+The BAM files are used for ANGSD, ROHan and PSMC, while the filtered VCF is
+used for PCAngsd, NGSadmix, FEIMS and GONE.
+</p>
 
 <p><a href="index.html">← Back to Home</a></p>
 
