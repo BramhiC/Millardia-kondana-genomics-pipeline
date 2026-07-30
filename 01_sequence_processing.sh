@@ -2,15 +2,38 @@
 
 #====================================================
 # Millardia kondana whole-genome sequencing pipeline
-# Sequence processing
+# Sequence processing and variant filtering
 #====================================================
 
+
+#----------------------------------------------------
+# Configuration
+# Replace the placeholder values before running
+#----------------------------------------------------
+
+# Reference genome
+REF=reference/Rrattus.fa
+
+# Computing resources
+THREADS=<NUM_THREADS>
+
+# Initial filtering thresholds
+MIN_MAPQ=<MAPQ_THRESHOLD>
+MIN_BASEQ=<BASEQ_THRESHOLD>
+MIN_QUAL=<VARIANT_QUAL_THRESHOLD>
+MIN_MAC=<MINOR_ALLELE_COUNT>
+MAX_MISSING=<MISSINGNESS_THRESHOLD>
+
+
+#----------------------------------------------------
 # Populations
-# K  = Sinhagad
-# R  = Rajgad
-# T  = Torna
-# RR = Raireshwar
-# MEL = M. meltada
+#----------------------------------------------------
+
+# K   = Sinhagad
+# R   = Rajgad
+# T   = Torna
+# RR  = Raireshwar
+# MEL = Millardia meltada
 
 
 #====================================================
@@ -27,9 +50,18 @@ conda install -c bioconda fastqc multiqc fastp bwa-mem2 samtools bcftools gatk4 
 # Create project structure
 #====================================================
 
-mkdir -p raw_fastq trimmed fastqc_raw fastqc_trimmed
-mkdir -p multiqc_raw multiqc_trimmed reference
-mkdir -p alignment bam variants stats metadata
+mkdir -p raw_fastq
+mkdir -p trimmed
+mkdir -p fastqc_raw
+mkdir -p fastqc_trimmed
+mkdir -p multiqc_raw
+mkdir -p multiqc_trimmed
+mkdir -p reference
+mkdir -p alignment
+mkdir -p bam
+mkdir -p variants
+mkdir -p stats
+mkdir -p metadata
 
 
 #====================================================
@@ -53,37 +85,7 @@ done
 
 
 #====================================================
-# Reads shorter than 150 bp
-#====================================================
-
-for file in raw_fastq/*.fastq.gz; do
-  reads=$(zcat "$file" | awk 'NR % 4 == 2 {print length($0)}' | awk '$1<150' | wc -l)
-  echo "$(basename "$file"): $reads reads shorter than 150bp"
-done
-
-
-#====================================================
-# Reads longer than 150 bp
-#====================================================
-
-for file in raw_fastq/*.fastq.gz; do
-  reads=$(zcat "$file" | awk 'NR % 4 == 2 {print length($0)}' | awk '$1>150' | wc -l)
-  echo "$(basename "$file"): $reads reads longer than 150bp"
-done
-
-
-#====================================================
-# Reads not equal to 150 bp
-#====================================================
-
-for file in raw_fastq/*.fastq.gz; do
-  count=$(zcat "$file" | awk 'NR % 4 == 2 {if (length($0) != 150) print length($0)}' | wc -l)
-  echo "$(basename "$file"): $count reads not equal to 150bp"
-done
-
-
-#====================================================
-# Check adapter contamination
+# Check Illumina adapter contamination
 #====================================================
 
 for file in raw_fastq/*.fastq.gz; do
@@ -93,10 +95,10 @@ done
 
 
 #====================================================
-# FastQC on raw reads
+# Quality control of raw reads
 #====================================================
 
-fastqc raw_fastq/*.fastq.gz -o fastqc_raw -t 16
+fastqc raw_fastq/*.fastq.gz -o fastqc_raw -t ${THREADS}
 
 multiqc fastqc_raw -o multiqc_raw
 
@@ -115,15 +117,15 @@ do
     -h trimmed/${sample}.html \
     -j trimmed/${sample}.json \
     --detect_adapter_for_pe \
-    --thread 16
+    --thread ${THREADS}
 done
 
 
 #====================================================
-# FastQC after trimming
+# Quality control after trimming
 #====================================================
 
-fastqc trimmed/*.fastq.gz -o fastqc_trimmed -t 16
+fastqc trimmed/*.fastq.gz -o fastqc_trimmed -t ${THREADS}
 
 multiqc fastqc_trimmed -o multiqc_trimmed
 
@@ -132,14 +134,14 @@ multiqc fastqc_trimmed -o multiqc_trimmed
 # Prepare reference genome
 #====================================================
 
-# Place Rrattus.fa in reference/
+# Place Rrattus.fa inside the reference/ directory
 
-bwa-mem2 index reference/Rrattus.fa
+bwa-mem2 index ${REF}
 
-samtools faidx reference/Rrattus.fa
+samtools faidx ${REF}
 
 gatk CreateSequenceDictionary \
--R reference/Rrattus.fa \
+-R ${REF} \
 -O reference/Rrattus.dict
 
 
@@ -150,8 +152,8 @@ gatk CreateSequenceDictionary \
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
 do
   bwa-mem2 mem \
-    -t 16 \
-    reference/Rrattus.fa \
+    -t ${THREADS} \
+    ${REF} \
     trimmed/${sample}_R1.trim.fastq.gz \
     trimmed/${sample}_R2.trim.fastq.gz \
     > alignment/${sample}.sam
@@ -164,7 +166,7 @@ done
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
 do
-  samtools sort -@ 16 \
+  samtools sort -@ ${THREADS} \
     -o bam/${sample}.sorted.bam \
     alignment/${sample}.sam
 
@@ -200,7 +202,7 @@ done
 
 
 #====================================================
-# Mean coverage
+# Mean sequencing coverage
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -212,7 +214,7 @@ done
 
 
 #====================================================
-# Create BAM list
+# Create BAM list for downstream analyses
 #====================================================
 
 ls bam/*.dedup.bam > bamlist.txt
@@ -223,11 +225,11 @@ ls bam/*.dedup.bam > bamlist.txt
 #====================================================
 
 bcftools mpileup \
--f reference/Rrattus.fa \
+-f ${REF} \
 -b bamlist.txt \
 -Ou \
--q 20 \
--Q 20 \
+-q ${MIN_MAPQ} \
+-Q ${MIN_BASEQ} \
 -a AD,DP | \
 bcftools call \
 -m -v -Oz \
@@ -246,41 +248,44 @@ variants/variants.raw.vcf.gz \
 
 
 #====================================================
-# QUAL > 20
+# Filter by variant quality
 #====================================================
 
-bcftools filter -i 'QUAL>20' \
+bcftools filter -i "QUAL>${MIN_QUAL}" \
 variants/variants.snps.vcf.gz \
--Oz -o variants/variants.qual20.vcf.gz
+-Oz -o variants/variants.qual.vcf.gz
 
 
 #====================================================
-# Remove rare variants (MAC > 3)
+# Remove rare variants
 #====================================================
 
-bcftools view -i 'MAC>3' \
-variants/variants.qual20.vcf.gz \
--Oz -o variants/variants.mac3.vcf.gz
+bcftools view -i "MAC>${MIN_MAC}" \
+variants/variants.qual.vcf.gz \
+-Oz -o variants/variants.mac.vcf.gz
 
 
 #====================================================
-# Remove SNPs with >20% missing data
+# Remove SNPs with excessive missing data
 #====================================================
 
-bcftools +fill-tags variants/variants.mac3.vcf.gz -- -t F_MISSING | \
-bcftools view -i 'F_MISSING<0.2' \
+bcftools +fill-tags variants/variants.mac.vcf.gz -- -t F_MISSING | \
+bcftools view -i "F_MISSING<${MAX_MISSING}" \
 -Oz -o variants/variants.filtered.vcf.gz
-
 
 bcftools index variants/variants.filtered.vcf.gz
 
 
 #====================================================
-# Final files
+# Final outputs
 #====================================================
 
-# Clean BAMs:
+# Clean BAM files:
 # bam/*.dedup.bam
 
-# Filtered SNPs:
+# Final filtered SNPs:
 # variants/variants.filtered.vcf.gz
+
+# QC reports:
+# multiqc_raw/multiqc_report.html
+# multiqc_trimmed/multiqc_report.html
