@@ -2,7 +2,7 @@
 Population genetics pipeline for M.kondana
 # Millardia kondana whole-genome population genomics pipeline
 
-This repository contains the analysis workflow used for whole-genome population genomics of the endangered Kondana soft-furred rat (*Millardia kondana*) across four isolated high-elevation plateau populations in the northern Western Ghats, India.
+This repository contains the analysis workflow to use for whole-genome population genomics of the endangered Kondana soft-furred rat (*Millardia kondana*) across four isolated high-elevation plateau populations in the northern Western Ghats, India.
 
 ---
 
@@ -14,7 +14,7 @@ This repository contains the analysis workflow used for whole-genome population 
 - **RR** — Raireshwar
 - **MEL** — *Millardia meltada* (comparative population)
 
-Illumina paired-end whole-genome sequencing data were generated for all individuals. Because no reference genome is currently available for *M. kondana*, reads were mapped to the **Rattus rattus** reference genome.
+Illumina whole-genome sequencing data were generated for all individuals. Because no reference genome is currently available for *M. kondana*, reads were mapped to the **Rattus rattus** reference genome.
 
 ---
 
