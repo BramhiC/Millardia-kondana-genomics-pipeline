@@ -1,6 +1,5 @@
 # Millardia-kondana-genomics-pipeline
 Population genetics pipeline for M.kondana
-# Millardia kondana whole-genome population genomics pipeline
 
 This repository contains the analysis workflow to use for whole-genome population genomics of the endangered Kondana soft-furred rat (*Millardia kondana*) across four isolated high-elevation plateau populations in the northern Western Ghats, India.
 
