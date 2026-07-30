@@ -1,23 +1,20 @@
 #!/bin/bash
 
 #====================================================
-# Millardia kondana whole-genome sequencing pipeline
-# Sequence processing and variant filtering
+# Millardia kondana whole-genome population genomics
+# Reference-based mapping using Rattus rattus genome
 #====================================================
 
 
 #----------------------------------------------------
 # Configuration
-# Replace the placeholder values before running
+# Replace placeholder values before running
 #----------------------------------------------------
 
-# Reference genome
 REF=reference/Rrattus.fa
 
-# Computing resources
 THREADS=<NUM_THREADS>
 
-# Initial filtering thresholds
 MIN_MAPQ=<MAPQ_THRESHOLD>
 MIN_BASEQ=<BASEQ_THRESHOLD>
 MIN_QUAL=<VARIANT_QUAL_THRESHOLD>
@@ -43,7 +40,9 @@ MAX_MISSING=<MISSINGNESS_THRESHOLD>
 conda create -n mkondana_wgs -y
 conda activate mkondana_wgs
 
-conda install -c bioconda fastqc multiqc fastp bwa-mem2 samtools bcftools gatk4 plink -y
+conda install -c bioconda \
+fastqc multiqc fastp bwa-mem2 samtools bcftools gatk4 \
+plink qualimap -y
 
 
 #====================================================
@@ -61,37 +60,8 @@ mkdir -p alignment
 mkdir -p bam
 mkdir -p variants
 mkdir -p stats
+mkdir -p qualimap
 mkdir -p metadata
-
-
-#====================================================
-# Rename downloaded files if needed
-#====================================================
-
-for file in *\\?download=1; do
-    newname=$(echo "$file" | sed "s/?download=1//")
-    mv "$file" "$newname"
-done
-
-
-#====================================================
-# Count sequencing reads
-#====================================================
-
-for file in raw_fastq/*.fastq.gz; do
-  read_count=$(( $(zcat "$file" | wc -l) / 4 ))
-  echo "$(basename "$file"): $read_count reads"
-done
-
-
-#====================================================
-# Check Illumina adapter contamination
-#====================================================
-
-for file in raw_fastq/*.fastq.gz; do
-  count=$(zcat "$file" | awk 'NR % 4 == 2' | grep -c 'CTGTCTCTTATACACATCT')
-  echo "$(basename "$file"): $count adapter-contaminated reads"
-done
 
 
 #====================================================
@@ -131,10 +101,8 @@ multiqc fastqc_trimmed -o multiqc_trimmed
 
 
 #====================================================
-# Prepare reference genome
+# Prepare reference genome (Rattus rattus)
 #====================================================
-
-# Place Rrattus.fa inside the reference/ directory
 
 bwa-mem2 index ${REF}
 
@@ -214,6 +182,19 @@ done
 
 
 #====================================================
+# Qualimap alignment assessment
+#====================================================
+
+for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
+do
+  qualimap bamqc \
+    -bam bam/${sample}.dedup.bam \
+    -outdir qualimap/${sample} \
+    -nt ${THREADS}
+done
+
+
+#====================================================
 # Create BAM list for downstream analyses
 #====================================================
 
@@ -277,6 +258,28 @@ bcftools index variants/variants.filtered.vcf.gz
 
 
 #====================================================
+# Prepare autosomal reference for PSMC / MSMC
+# Remove mitochondrial and sex-chromosome scaffolds
+#====================================================
+
+grep -v -E "chrX|chrY|MT|M|mitochond" ${REF}.fai | cut -f1 > autosomes.list
+
+samtools faidx ${REF} $(cat autosomes.list) > reference/Rrattus.autosomes.fa
+
+
+#====================================================
+# Notes for demographic analyses
+#====================================================
+
+# - PSMC should be run on high-quality individuals with adequate coverage.
+# - Minimum depth for PSMC consensus generation should be ≥10×.
+# - Exact depth thresholds should be chosen after inspecting coverage distribution.
+# - Sensitivity analysis can be performed using alternative -t and -p values.
+# - If multiple high-quality phased genomes are available, MSMC can be evaluated
+#   as an alternative or complementary approach to PSMC.
+
+
+#====================================================
 # Final outputs
 #====================================================
 
@@ -289,3 +292,6 @@ bcftools index variants/variants.filtered.vcf.gz
 # QC reports:
 # multiqc_raw/multiqc_report.html
 # multiqc_trimmed/multiqc_report.html
+
+# Alignment QC:
+# qualimap/*/genome_results.txt
