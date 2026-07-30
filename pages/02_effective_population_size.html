@@ -1,1 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Effective Population Size</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
 
+<body>
+
+<h1>Effective Population Size</h1>
+
+<p>
+This section estimates both historical and contemporary effective population
+size (Ne) for the four plateau populations of Millardia kondana.
+</p>
+
+<hr>
+
+<h2>Biological Rationale</h2>
+
+<p>
+The four plateau systems (Sinhagad, Rajgad, Torna and Raireshwar) are
+geographically isolated. Historical isolation, habitat fragmentation and
+small population size may have caused demographic decline, reduced gene
+flow and increased inbreeding.
+</p>
+
+<p>
+Two complementary approaches are used:
+</p>
+
+<ul>
+  <li><strong>PSMC</strong> — historical Ne through time from whole-genome
+  heterozygosity of single individuals.</li>
+  <li><strong>GONE</strong> — contemporary Ne from linkage disequilibrium among
+  SNPs within each population.</li>
+</ul>
+
+<hr>
+
+<h2>Input Files</h2>
+
+<ul>
+  <li>Cleaned BAM files from Sequence Processing</li>
+  <li>Filtered SNP VCF</li>
+  <li>Reference genome: Rrattus.fa</li>
+</ul>
+
+<hr>
+
+<h2>Part I — Historical Ne (PSMC)</h2>
+
+<h3>Sample Selection</h3>
+
+<p>
+PSMC performs best with high-quality, relatively high-coverage genomes.
+Select the two highest-coverage individuals from each plateau.
+</p>
+
+<pre><code>SIN_03
+SIN_08
+
+RAJ_02
+RAJ_07
+
+TOR_01
+TOR_09
+
+RAI_04
+RAI_10
+</code></pre>
+
+<p>
+(Replace with your actual highest-coverage samples.)
+</p>
+
+<hr>
+
+<h3>Generate Consensus FASTQ</h3>
+
+<p>Create a script: <code>scripts/02_effective_population_size/psmc_consensus.sh</code></p>
+
+<pre><code>#!/bin/bash
+
+SAMPLE=$1
+
+bcftools mpileup \
+-f reference/Rrattus.fa \
+-q 20 -Q 20 \
+bam/${SAMPLE}.dedup.bam | \
+bcftools call -c | \
+vcfutils.pl vcf2fq -d 5 -D 100 > psmc/${SAMPLE}.fq
+</code></pre>
+
+<p>Run for each selected sample:</p>
+
+<pre><code>mkdir -p psmc
+
+bash scripts/02_effective_population_size/psmc_consensus.sh SIN_03
+</code></pre>
+
+<hr>
+
+<h3>Convert to PSMCFA</h3>
+
+<pre><code>fq2psmcfa -q20 psmc/SIN_03.fq > psmc/SIN_03.psmcfa
+</code></pre>
+
+<hr>
+
+<h3>Run PSMC</h3>
+
+<pre><code>psmc -N25 -t15 -r5 -p "4+25*2+4+6" \
+-o psmc/SIN_03.psmc \
+psmc/SIN_03.psmcfa
+</code></pre>
+
+<p>Repeat for all selected individuals.</p>
+
+<hr>
+
+<h3>Bootstrap Replicates</h3>
+
+<pre><code>splitfa psmc/SIN_03.psmcfa > psmc/SIN_03.split.psmcfa
+
+for i in {1..100}
+do
+  seqtk sample -s$i psmc/SIN_03.split.psmcfa 100 > psmc/bootstrap.$i.psmcfa
+
+  psmc -N25 -t15 -r5 -b -p "4+25*2+4+6" \
+  -o psmc/bootstrap.$i.psmc \
+  psmc/bootstrap.$i.psmcfa
+done
+</code></pre>
+
+<hr>
+
+<h3>Plot Historical Ne</h3>
+
+<pre><code>psmc_plot.pl -u 2.5e-8 -g 0.5 psmc/SIN_03 psmc/SIN_03.psmc
+</code></pre>
+
+<p><strong>Assumptions</strong></p>
+
+<ul>
+  <li>Mutation rate: 2.5 × 10^-8 per site per generation</li>
+  <li>Generation time: 0.5 years</li>
+</ul>
+
+<hr>
+
+<h3>Interpretation</h3>
+
+<ul>
+  <li>Recent decline → sharp drop toward present.</li>
+  <li>Long-term small population → persistently low Ne.</li>
+  <li>Similar curves among plateaus → shared demographic history.</li>
+  <li>Divergent curves → population-specific demographic events.</li>
+</ul>
+
+<hr>
+
+<h2>Part II — Current Ne (GONE)</h2>
+
+<p>
+Current Ne is estimated separately for each plateau population.
+</p>
+
+<hr>
+
+<h3>Create Population-Specific Sample Lists</h3>
+
+<pre><code>grep "Sinhagad" sample_metadata.tsv | cut -f1 > SIN.list
+grep "Rajgad"   sample_metadata.tsv | cut -f1 > RAJ.list
+grep "Torna"    sample_metadata.tsv | cut -f1 > TOR.list
+grep "Raireshwar" sample_metadata.tsv | cut -f1 > RAI.list
+</code></pre>
+
+<hr>
+
+<h3>Extract Population VCFs</h3>
+
+<pre><code>bcftools view -S SIN.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/SIN.vcf.gz
+
+bcftools view -S RAJ.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/RAJ.vcf.gz
+
+bcftools view -S TOR.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/TOR.vcf.gz
+
+bcftools view -S RAI.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/RAI.vcf.gz
+</code></pre>
+
+<hr>
+
+<h3>Convert to PLINK Format</h3>
+
+<pre><code>plink --vcf variants/SIN.vcf.gz --make-bed --out gone/SIN
+plink --vcf variants/RAJ.vcf.gz --make-bed --out gone/RAJ
+plink --vcf variants/TOR.vcf.gz --make-bed --out gone/TOR
+plink --vcf variants/RAI.vcf.gz --make-bed --out gone/RAI
+</code></pre>
+
+<hr>
+
+<h3>Run GONE</h3>
+
+<pre><code>mkdir -p gone/results
+
+cd gone
+
+cp SIN.bed INPUT_FILES/
+cp SIN.bim INPUT_FILES/
+cp SIN.fam INPUT_FILES/
+
+bash script_GONE.sh SIN
+</code></pre>
+
+<p>Repeat for RAJ, TOR and RAI.</p>
+
+<hr>
+
+<h3>Output Files</h3>
+
+<pre><code>gone/results/SIN_Ne.txt
+gone/results/RAJ_Ne.txt
+gone/results/TOR_Ne.txt
+gone/results/RAI_Ne.txt
+</code></pre>
+
+<hr>
+
+<h3>Interpretation</h3>
+
+<ul>
+  <li>Ne < 50 → severe recent reduction.</li>
+  <li>Ne 50–200 → moderate concern.</li>
+  <li>Ne > 200 → relatively larger contemporary population.</li>
+</ul>
+
+<hr>
+
+<h2>Expected Biological Pattern</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+<tr>
+  <th>Population</th>
+  <th>Predicted historical Ne</th>
+  <th>Predicted current Ne</th>
+</tr>
+<tr>
+  <td>Sinhagad</td>
+  <td>Low–moderate</td>
+  <td>Low</td>
+</tr>
+<tr>
+  <td>Rajgad</td>
+  <td>Moderate</td>
+  <td>Moderate</td>
+</tr>
+<tr>
+  <td>Torna</td>
+  <td>Moderate–high</td>
+  <td>Moderate</td>
+</tr>
+<tr>
+  <td>Raireshwar</td>
+  <td>Highest</td>
+  <td>Highest</td>
+</tr>
+</table>
+
+<p>
+These are hypotheses based on plateau size and disturbance and should not be
+treated as expected results.
+</p>
+
+<hr>
+
+<h2>Final Outputs</h2>
+
+<ul>
+  <li>8 PSMC demographic curves</li>
+  <li>100 bootstrap replicates per individual</li>
+  <li>4 contemporary Ne estimates from GONE</li>
+  <li>Comparative Ne summary table</li>
+</ul>
+
+<hr>
+
+<h2>Next Step</h2>
+
+<p>
+Proceed to <a href="03_gene_flow_genetic_differentiation.html">
+Gene Flow & Genetic Differentiation</a>.
+</p>
+
+<p><a href="index.html">← Back to Home</a></p>
+
+</body>
+</html>
