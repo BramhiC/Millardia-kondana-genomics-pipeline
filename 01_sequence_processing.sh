@@ -1,28 +1,3 @@
-Yes. Your first page should also be made more compact and lab-style.
-
-I removed:
-
-* tutorial-style explanations,
-
-* “expected outputs” prose,
-
-* long descriptive comments,
-
-* AI-sounding sentences.
-
-I kept only:
-
-* section headers,
-
-* essential notes,
-
-* commands.
-
-Here is the cleaned `01_sequence_processing.sh` in the same style as the revised Page 2.
-
-Bash
-
-```
 #!/bin/bash
 
 #====================================================
@@ -272,4 +247,3 @@ bcftools index variants/variants.filtered.vcf.gz
 grep -v -E "chrX|chrY|MT|M|mitochond" ${REF}.fai | cut -f1 > autosomes.list
 
 samtools faidx ${REF} $(cat autosomes.list) > reference/Rrattus.autosomes.fa
-```
