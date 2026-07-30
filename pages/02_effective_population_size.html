@@ -11,122 +11,151 @@
 <h1>Effective Population Size</h1>
 
 <p>
-This section estimates both historical and contemporary effective population
-size (Ne) for the four plateau populations of Millardia kondana.
+This section describes the estimation of historical and contemporary effective
+population size (Ne) for the four plateau populations of Millardia kondana.
+Historical Ne is estimated using PSMC, while contemporary Ne is estimated
+using GONE.
 </p>
 
 <hr>
 
-<h2>Biological Rationale</h2>
+<h2>Software installation</h2>
 
-<p>
-The four plateau systems (Sinhagad, Rajgad, Torna and Raireshwar) are
-geographically isolated. Historical isolation, habitat fragmentation and
-small population size may have caused demographic decline, reduced gene
-flow and increased inbreeding.
-</p>
+<pre><code>conda activate mkondana_wgs
 
-<p>
-Two complementary approaches are used:
-</p>
-
-<ul>
-  <li><strong>PSMC</strong> — historical Ne through time from whole-genome
-  heterozygosity of single individuals.</li>
-  <li><strong>GONE</strong> — contemporary Ne from linkage disequilibrium among
-  SNPs within each population.</li>
-</ul>
-
-<hr>
-
-<h2>Input Files</h2>
-
-<ul>
-  <li>Cleaned BAM files from Sequence Processing</li>
-  <li>Filtered SNP VCF</li>
-  <li>Reference genome: Rrattus.fa</li>
-</ul>
-
-<hr>
-
-<h2>Part I — Historical Ne (PSMC)</h2>
-
-<h3>Sample Selection</h3>
-
-<p>
-PSMC performs best with high-quality, relatively high-coverage genomes.
-Select the two highest-coverage individuals from each plateau.
-</p>
-
-<pre><code>SIN_03
-SIN_08
-
-RAJ_02
-RAJ_07
-
-TOR_01
-TOR_09
-
-RAI_04
-RAI_10
+conda install -c bioconda psmc seqtk -y
 </code></pre>
 
 <p>
-(Replace with your actual highest-coverage samples.)
+GONE is downloaded separately from the official repository and placed in the
+<code>gone/</code> directory.
 </p>
 
 <hr>
 
-<h3>Generate Consensus FASTQ</h3>
+<h2>Input files</h2>
 
-<p>Create a script: <code>scripts/02_effective_population_size/psmc_consensus.sh</code></p>
+<ul>
+  <li>Cleaned BAM files from Sequence Processing</li>
+  <li>Filtered SNP VCF: <code>variants/variants.filtered.vcf.gz</code></li>
+  <li>Reference genome: <code>reference/Rrattus.fa</code></li>
+</ul>
 
-<pre><code>#!/bin/bash
+<hr>
 
-SAMPLE=$1
+<h1>Part I: Historical effective population size (PSMC)</h1>
+
+<p>
+PSMC reconstructs changes in effective population size through time from the
+distribution of heterozygous sites in a single diploid genome.
+</p>
+
+<hr>
+
+<h2>Step 1: Select high-coverage samples</h2>
+
+<p>
+Choose the highest-coverage individuals from each population using the coverage
+files generated during sequence processing.
+</p>
+
+<pre><code>ls stats/*.mean_coverage.txt
+</code></pre>
+
+<p>
+Example selected samples:
+</p>
+
+<pre><code>K3
+K18
+R7
+R21
+T5
+T19
+RR4
+RR15
+</code></pre>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>Samples with the highest and most even coverage</li>
+  <li>These samples will be used for PSMC</li>
+</ul>
+
+<hr>
+
+<h2>Step 2: Generate consensus FASTQ</h2>
+
+<pre><code>mkdir -p psmc
 
 bcftools mpileup \
 -f reference/Rrattus.fa \
 -q 20 -Q 20 \
-bam/${SAMPLE}.dedup.bam | \
+bam/K3.dedup.bam | \
 bcftools call -c | \
-vcfutils.pl vcf2fq -d 5 -D 100 > psmc/${SAMPLE}.fq
+vcfutils.pl vcf2fq -d 5 -D 100 > psmc/K3.fq
 </code></pre>
 
-<p>Run for each selected sample:</p>
+<p>
+This converts the mapped BAM file into a diploid consensus FASTQ. Positions
+with very low or extremely high coverage are filtered out.
+</p>
 
-<pre><code>mkdir -p psmc
+<h3>What to expect</h3>
 
-bash scripts/02_effective_population_size/psmc_consensus.sh SIN_03
-</code></pre>
+<ul>
+  <li><code>psmc/K3.fq</code></li>
+  <li>A consensus sequence representing the diploid genome</li>
+</ul>
 
 <hr>
 
-<h3>Convert to PSMCFA</h3>
+<h2>Step 3: Convert FASTQ to PSMC format</h2>
 
-<pre><code>fq2psmcfa -q20 psmc/SIN_03.fq > psmc/SIN_03.psmcfa
+<pre><code>fq2psmcfa -q20 psmc/K3.fq > psmc/K3.psmcfa
 </code></pre>
+
+<p>
+The consensus FASTQ is converted into the compressed PSMC input format.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li><code>psmc/K3.psmcfa</code></li>
+</ul>
 
 <hr>
 
-<h3>Run PSMC</h3>
+<h2>Step 4: Run PSMC</h2>
 
 <pre><code>psmc -N25 -t15 -r5 -p "4+25*2+4+6" \
--o psmc/SIN_03.psmc \
-psmc/SIN_03.psmcfa
+-o psmc/K3.psmc \
+psmc/K3.psmcfa
 </code></pre>
 
-<p>Repeat for all selected individuals.</p>
+<p>
+This estimates historical effective population size through time for the
+selected individual.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li><code>psmc/K3.psmc</code></li>
+  <li>Estimated demographic history for the sample</li>
+</ul>
 
 <hr>
 
-<h3>Bootstrap Replicates</h3>
+<h2>Step 5: Bootstrap replicates</h2>
 
-<pre><code>splitfa psmc/SIN_03.psmcfa > psmc/SIN_03.split.psmcfa
+<pre><code>splitfa psmc/K3.psmcfa > psmc/K3.split.psmcfa
 
 for i in {1..100}
 do
-  seqtk sample -s$i psmc/SIN_03.split.psmcfa 100 > psmc/bootstrap.$i.psmcfa
+  seqtk sample -s$i psmc/K3.split.psmcfa 100 > psmc/bootstrap.$i.psmcfa
 
   psmc -N25 -t15 -r5 -b -p "4+25*2+4+6" \
   -o psmc/bootstrap.$i.psmc \
@@ -134,169 +163,162 @@ do
 done
 </code></pre>
 
+<p>
+Bootstrap replicates provide confidence around the demographic curve.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>100 bootstrap PSMC files</li>
+</ul>
+
 <hr>
 
-<h3>Plot Historical Ne</h3>
+<h2>Step 6: Plot historical Ne</h2>
 
-<pre><code>psmc_plot.pl -u 2.5e-8 -g 0.5 psmc/SIN_03 psmc/SIN_03.psmc
+<pre><code>psmc_plot.pl -u 2.5e-8 -g 0.5 psmc/K3 psmc/K3.psmc
 </code></pre>
 
-<p><strong>Assumptions</strong></p>
+<p>
+The PSMC output is converted into a demographic plot using a mutation rate of
+2.5 × 10^-8 per site per generation and a generation time of 0.5 years.
+</p>
+
+<h3>What to expect</h3>
 
 <ul>
-  <li>Mutation rate: 2.5 × 10^-8 per site per generation</li>
-  <li>Generation time: 0.5 years</li>
+  <li>PDF and PNG demographic plots</li>
+  <li>Historical Ne through time</li>
 </ul>
 
 <hr>
 
-<h3>Interpretation</h3>
-
-<ul>
-  <li>Recent decline → sharp drop toward present.</li>
-  <li>Long-term small population → persistently low Ne.</li>
-  <li>Similar curves among plateaus → shared demographic history.</li>
-  <li>Divergent curves → population-specific demographic events.</li>
-</ul>
-
-<hr>
-
-<h2>Part II — Current Ne (GONE)</h2>
+<h1>Part II: Contemporary effective population size (GONE)</h1>
 
 <p>
-Current Ne is estimated separately for each plateau population.
+GONE estimates recent effective population size from linkage disequilibrium
+among SNPs within each population.
 </p>
 
 <hr>
 
-<h3>Create Population-Specific Sample Lists</h3>
+<h2>Step 1: Create population sample lists</h2>
 
-<pre><code>grep "Sinhagad" sample_metadata.tsv | cut -f1 > SIN.list
-grep "Rajgad"   sample_metadata.tsv | cut -f1 > RAJ.list
-grep "Torna"    sample_metadata.tsv | cut -f1 > TOR.list
-grep "Raireshwar" sample_metadata.tsv | cut -f1 > RAI.list
+<pre><code>grep "Sinhagad" sample_metadata.tsv | cut -f1 > K.list
+grep "Rajgad" sample_metadata.tsv | cut -f1 > R.list
+grep "Torna" sample_metadata.tsv | cut -f1 > T.list
+grep "Raireshwar" sample_metadata.tsv | cut -f1 > RR.list
 </code></pre>
 
-<hr>
+<p>
+Each list contains the sample IDs belonging to one population.
+</p>
 
-<h3>Extract Population VCFs</h3>
-
-<pre><code>bcftools view -S SIN.list variants/variants.filtered.vcf.gz \
--Oz -o variants/SIN.vcf.gz
-
-bcftools view -S RAJ.list variants/variants.filtered.vcf.gz \
--Oz -o variants/RAJ.vcf.gz
-
-bcftools view -S TOR.list variants/variants.filtered.vcf.gz \
--Oz -o variants/TOR.vcf.gz
-
-bcftools view -S RAI.list variants/variants.filtered.vcf.gz \
--Oz -o variants/RAI.vcf.gz
-</code></pre>
-
-<hr>
-
-<h3>Convert to PLINK Format</h3>
-
-<pre><code>plink --vcf variants/SIN.vcf.gz --make-bed --out gone/SIN
-plink --vcf variants/RAJ.vcf.gz --make-bed --out gone/RAJ
-plink --vcf variants/TOR.vcf.gz --make-bed --out gone/TOR
-plink --vcf variants/RAI.vcf.gz --make-bed --out gone/RAI
-</code></pre>
-
-<hr>
-
-<h3>Run GONE</h3>
-
-<pre><code>mkdir -p gone/results
-
-cd gone
-
-cp SIN.bed INPUT_FILES/
-cp SIN.bim INPUT_FILES/
-cp SIN.fam INPUT_FILES/
-
-bash script_GONE.sh SIN
-</code></pre>
-
-<p>Repeat for RAJ, TOR and RAI.</p>
-
-<hr>
-
-<h3>Output Files</h3>
-
-<pre><code>gone/results/SIN_Ne.txt
-gone/results/RAJ_Ne.txt
-gone/results/TOR_Ne.txt
-gone/results/RAI_Ne.txt
-</code></pre>
-
-<hr>
-
-<h3>Interpretation</h3>
+<h3>What to expect</h3>
 
 <ul>
-  <li>Ne < 50 → severe recent reduction.</li>
-  <li>Ne 50–200 → moderate concern.</li>
-  <li>Ne > 200 → relatively larger contemporary population.</li>
+  <li><code>K.list</code></li>
+  <li><code>R.list</code></li>
+  <li><code>T.list</code></li>
+  <li><code>RR.list</code></li>
 </ul>
 
 <hr>
 
-<h2>Expected Biological Pattern</h2>
+<h2>Step 2: Extract population-specific VCFs</h2>
 
-<table border="1" cellpadding="6" cellspacing="0">
-<tr>
-  <th>Population</th>
-  <th>Predicted historical Ne</th>
-  <th>Predicted current Ne</th>
-</tr>
-<tr>
-  <td>Sinhagad</td>
-  <td>Low–moderate</td>
-  <td>Low</td>
-</tr>
-<tr>
-  <td>Rajgad</td>
-  <td>Moderate</td>
-  <td>Moderate</td>
-</tr>
-<tr>
-  <td>Torna</td>
-  <td>Moderate–high</td>
-  <td>Moderate</td>
-</tr>
-<tr>
-  <td>Raireshwar</td>
-  <td>Highest</td>
-  <td>Highest</td>
-</tr>
-</table>
+<pre><code>bcftools view -S K.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/K.vcf.gz
+
+bcftools view -S R.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/R.vcf.gz
+
+bcftools view -S T.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/T.vcf.gz
+
+bcftools view -S RR.list variants/variants.filtered.vcf.gz \
+-Oz -o variants/RR.vcf.gz
+</code></pre>
 
 <p>
-These are hypotheses based on plateau size and disturbance and should not be
-treated as expected results.
+This creates separate SNP datasets for each population.
 </p>
 
-<hr>
-
-<h2>Final Outputs</h2>
+<h3>What to expect</h3>
 
 <ul>
-  <li>8 PSMC demographic curves</li>
-  <li>100 bootstrap replicates per individual</li>
-  <li>4 contemporary Ne estimates from GONE</li>
-  <li>Comparative Ne summary table</li>
+  <li><code>K.vcf.gz</code></li>
+  <li><code>R.vcf.gz</code></li>
+  <li><code>T.vcf.gz</code></li>
+  <li><code>RR.vcf.gz</code></li>
 </ul>
 
 <hr>
 
-<h2>Next Step</h2>
+<h2>Step 3: Convert VCF to PLINK format</h2>
+
+<pre><code>plink --vcf variants/K.vcf.gz --make-bed --out gone/K
+plink --vcf variants/R.vcf.gz --make-bed --out gone/R
+plink --vcf variants/T.vcf.gz --make-bed --out gone/T
+plink --vcf variants/RR.vcf.gz --make-bed --out gone/RR
+</code></pre>
 
 <p>
-Proceed to <a href="03_gene_flow_genetic_differentiation.html">
-Gene Flow & Genetic Differentiation</a>.
+GONE requires PLINK binary files as input.
 </p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li><code>.bed</code></li>
+  <li><code>.bim</code></li>
+  <li><code>.fam</code></li>
+</ul>
+
+<hr>
+
+<h2>Step 4: Run GONE</h2>
+
+<pre><code>cd gone
+
+bash script_GONE.sh K
+bash script_GONE.sh R
+bash script_GONE.sh T
+bash script_GONE.sh RR
+
+cd ..
+</code></pre>
+
+<p>
+GONE estimates recent effective population size for each plateau population.
+</p>
+
+<h3>What to expect</h3>
+
+<ul>
+  <li>Ne estimates for each population</li>
+  <li>Recent demographic trends</li>
+</ul>
+
+<hr>
+
+<h2>Final outputs</h2>
+
+<h3>Historical Ne</h3>
+
+<ul>
+  <li>PSMC plots for selected individuals</li>
+  <li>Bootstrap confidence replicates</li>
+</ul>
+
+<h3>Contemporary Ne</h3>
+
+<ul>
+  <li>GONE Ne estimates for K, R, T and RR populations</li>
+</ul>
+
+<hr>
 
 <p><a href="index.html">← Back to Home</a></p>
 
