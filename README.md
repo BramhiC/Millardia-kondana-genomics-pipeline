@@ -23,7 +23,7 @@ This repository contains the analysis workflow to use for whole-genome populatio
 
 | Step | Software |
 |---|---|
-| Quality control | FastQC, MultiQC |
+| Quality control | FastQC, MultiQC, Qualimap |
 | Adapter and quality trimming | fastp |
 | Read mapping | BWA-MEM2 |
 | BAM sorting and indexing | SAMtools |
@@ -32,11 +32,11 @@ This repository contains the analysis workflow to use for whole-genome populatio
 | Population structure | ANGSD, PCAngsd, NGSadmix |
 | Genetic differentiation | realSFS, FEIMS |
 | Genetic diversity | ANGSD, thetaStat |
-| Historical effective population size | PSMC |
+| Historical effective population size | MSMC, PSMC(optional) |
 | Recent effective population size | PLINK, GONE |
 | Inbreeding and ROH | ROHan |
 | Visualization | R (ggplot2, ComplexHeatmap) |
-| Optional QC | Qualimap, IGV |
+| Optional QC | IGV |
 
 ## Script descriptions
 
@@ -44,7 +44,7 @@ This repository contains the analysis workflow to use for whole-genome populatio
 Quality control, adapter trimming, mapping to the *Rattus rattus* reference genome, BAM processing, joint SNP calling, and variant filtering.
 
 ### 02_effective_population_size.sh
-Historical effective population size using PSMC and recent effective population size using GONE.
+Historical effective population size using MSMC and recent effective population size using GONE.
 
 ### 03_population_structure_gene_flow.sh
 Population structure using PCAngsd and NGSadmix, pairwise FST estimation using ANGSD/realSFS, and gene-flow analysis using FEIMS.
