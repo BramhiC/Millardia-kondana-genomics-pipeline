@@ -1,1 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sequence Processing</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
 
+<body>
+
+<h1>Sequence Processing</h1>
+
+<p>
+This section describes the preprocessing workflow for Illumina whole-genome
+resequencing data. The goal is to convert raw paired-end FASTQ files into
+high-quality, duplicate-marked and indexed BAM files suitable for population
+genomic analyses.
+</p>
+
+<h2>Biological Context</h2>
+
+<p>
+The pipeline is designed for <em>Millardia kondana</em>, a non-model rodent
+without a species-specific reference genome. Reads are aligned to the
+<em>Rattus rattus</em> reference genome, which is used as a surrogate reference
+for downstream analyses.
+</p>
+
+<h2>Input Data</h2>
+
+<ul>
+  <li>Illumina paired-end whole-genome sequencing</li>
+  <li>~36 GB data requested per sample</li>
+  <li>40 <em>M. kondana</em> individuals from four plateau populations</li>
+  <li>10 <em>M. meltada</em> individuals for diversity comparison</li>
+</ul>
+
+<h2>Expected File Names</h2>
+
+<pre><code>SIN_01_R1.fastq.gz
+SIN_01_R2.fastq.gz
+
+RAJ_01_R1.fastq.gz
+RAJ_01_R2.fastq.gz
+
+TOR_01_R1.fastq.gz
+TOR_01_R2.fastq.gz
+
+RAI_01_R1.fastq.gz
+RAI_01_R2.fastq.gz
+
+MEL_01_R1.fastq.gz
+MEL_01_R2.fastq.gz
+</code></pre>
+
+<h2>Population Prefixes</h2>
+
+<ul>
+  <li>SIN = Sinhagad</li>
+  <li>RAJ = Rajgad</li>
+  <li>TOR = Torna</li>
+  <li>RAI = Raireshwar</li>
+  <li>MEL = <em>Millardia meltada</em></li>
+</ul>
+
+<h2>Metadata File</h2>
+
+<p>Create a tab-separated metadata file named <code>sample_metadata.tsv</code>.</p>
+
+<pre><code>sample	population	species
+SIN_01	Sinhagad	M_kondana
+SIN_02	Sinhagad	M_kondana
+RAJ_01	Rajgad	M_kondana
+TOR_01	Torna	M_kondana
+RAI_01	Raireshwar	M_kondana
+MEL_01	Meltada	M_meltada
+</code></pre>
+
+<h2>Project Structure</h2>
+
+<pre><code>project/
+├── raw_fastq/
+├── trimmed/
+├── fastqc_raw/
+├── fastqc_trimmed/
+├── multiqc_raw/
+├── multiqc_trimmed/
+├── reference/
+├── alignment/
+├── bam/
+├── stats/
+├── logs/
+└── scripts/
+</code></pre>
+
+<h2>Software</h2>
+
+<ul>
+  <li>FastQC</li>
+  <li>MultiQC</li>
+  <li>fastp</li>
+  <li>BWA-MEM2</li>
+  <li>SAMtools</li>
+  <li>Picard</li>
+</ul>
+
+<h2>Step 1: Quality Assessment</h2>
+
+<p>Run FastQC on all raw FASTQ files.</p>
+
+<pre><code>mkdir -p fastqc_raw
+
+fastqc raw_fastq/*.fastq.gz \
+-o fastqc_raw \
+-t 16
+</code></pre>
+
+<h3>Summarize with MultiQC</h3>
+
+<pre><code>multiqc fastqc_raw \
+-o multiqc_raw
+</code></pre>
+
+<h2>Step 2: Adapter and Quality Trimming</h2>
+
+<p>Trim adapters and low-quality bases using fastp.</p>
+
+<pre><code>mkdir -p trimmed
+
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  fastp \
+    -i raw_fastq/${sample}_R1.fastq.gz \
+    -I raw_fastq/${sample}_R2.fastq.gz \
+    -o trimmed/${sample}_R1.trim.fastq.gz \
+    -O trimmed/${sample}_R2.trim.fastq.gz \
+    -h trimmed/${sample}.html \
+    -j trimmed/${sample}.json \
+    --detect_adapter_for_pe \
+    --thread 16
+done
+</code></pre>
+
+<h2>Step 3: Quality Check After Trimming</h2>
+
+<pre><code>mkdir -p fastqc_trimmed
+
+fastqc trimmed/*.fastq.gz \
+-o fastqc_trimmed \
+-t 16
+
+multiqc fastqc_trimmed \
+-o multiqc_trimmed
+</code></pre>
+
+<h2>Step 4: Download Reference Genome</h2>
+
+<p>Create the reference directory.</p>
+
+<pre><code>mkdir -p reference
+cd reference
+</code></pre>
+
+<p>Place the <em>Rattus rattus</em> reference genome as:</p>
+
+<pre><code>Rrattus.fa
+</code></pre>
+
+<h2>Step 5: Index the Reference</h2>
+
+<h3>BWA</h3>
+
+<pre><code>bwa-mem2 index Rrattus.fa
+</code></pre>
+
+<h3>SAMtools</h3>
+
+<pre><code>samtools faidx Rrattus.fa
+</code></pre>
+
+<h3>Picard</h3>
+
+<pre><code>picard CreateSequenceDictionary \
+R=Rrattus.fa \
+O=Rrattus.dict
+</code></pre>
+
+<h2>Step 6: Align Reads</h2>
+
+<pre><code>mkdir -p alignment
+
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  bwa-mem2 mem \
+    -t 16 \
+    reference/Rrattus.fa \
+    trimmed/${sample}_R1.trim.fastq.gz \
+    trimmed/${sample}_R2.trim.fastq.gz \
+    > alignment/${sample}.sam
+done
+</code></pre>
+
+<h2>Step 7: Convert and Sort BAM</h2>
+
+<pre><code>mkdir -p bam
+
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  samtools sort \
+    -@ 16 \
+    -o bam/${sample}.sorted.bam \
+    alignment/${sample}.sam
+
+  samtools index bam/${sample}.sorted.bam
+done
+</code></pre>
+
+<h2>Step 8: Mark PCR Duplicates</h2>
+
+<pre><code>mkdir -p stats
+
+for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  picard MarkDuplicates \
+    I=bam/${sample}.sorted.bam \
+    O=bam/${sample}.dedup.bam \
+    M=stats/${sample}.dup_metrics.txt \
+    REMOVE_DUPLICATES=false
+
+  samtools index bam/${sample}.dedup.bam
+done
+</code></pre>
+
+<h2>Step 9: Alignment Statistics</h2>
+
+<pre><code>for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  samtools flagstat \
+    bam/${sample}.dedup.bam \
+    > stats/${sample}.flagstat
+
+  samtools stats \
+    bam/${sample}.dedup.bam \
+    > stats/${sample}.stats
+done
+</code></pre>
+
+<h2>Step 10: Coverage Estimation</h2>
+
+<pre><code>for sample in $(cut -f1 sample_metadata.tsv | tail -n +2)
+do
+  samtools depth -a bam/${sample}.dedup.bam | \
+  awk '{sum+=$3} END {print sum/NR}' \
+  > stats/${sample}.mean_coverage.txt
+done
+</code></pre>
+
+<h2>Quality Thresholds</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+<tr>
+  <th>Metric</th>
+  <th>Target</th>
+</tr>
+<tr>
+  <td>Q30 bases</td>
+  <td>>85%</td>
+</tr>
+<tr>
+  <td>Adapter contamination</td>
+  <td><5%</td>
+</tr>
+<tr>
+  <td>Mapping rate</td>
+  <td>>80%</td>
+</tr>
+<tr>
+  <td>Duplicate rate</td>
+  <td><20%</td>
+</tr>
+<tr>
+  <td>Mean coverage</td>
+  <td>≥10× preferred</td>
+</tr>
+</table>
+
+<h2>Final Output</h2>
+
+<p>For each sample:</p>
+
+<pre><code>bam/SIN_01.dedup.bam
+bam/SIN_01.dedup.bam.bai
+</code></pre>
+
+<p>For the entire project:</p>
+
+<pre><code>50 cleaned BAM files
+50 BAM index files
+FastQC reports
+MultiQC summaries
+Duplicate metrics
+Coverage estimates
+</code></pre>
+
+<h2>Downstream Use</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+<tr>
+  <th>Analysis</th>
+  <th>Input</th>
+</tr>
+<tr>
+  <td>GONE</td>
+  <td>Filtered SNPs</td>
+</tr>
+<tr>
+  <td>PSMC</td>
+  <td>High-coverage BAMs</td>
+</tr>
+<tr>
+  <td>ANGSD</td>
+  <td>Cleaned BAMs</td>
+</tr>
+<tr>
+  <td>PCAngsd</td>
+  <td>ANGSD genotype likelihoods</td>
+</tr>
+<tr>
+  <td>NGSadmix</td>
+  <td>Beagle genotype likelihoods</td>
+</tr>
+<tr>
+  <td>FST</td>
+  <td>Population-specific BAM lists</td>
+</tr>
+<tr>
+  <td>ROHan</td>
+  <td>Individual BAMs</td>
+</tr>
+</table>
+
+<p><a href="index.html">← Back to Home</a></p>
+
+</body>
+</html>
