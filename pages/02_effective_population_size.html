@@ -31,6 +31,13 @@ GONE is downloaded separately from the official repository and placed in the
 <code>gone/</code> directory.
 </p>
 
+<h3>What to expect</h3>
+
+<ul>
+  <li>PSMC and Seqtk available in the conda environment</li>
+  <li>GONE available in the project directory</li>
+</ul>
+
 <hr>
 
 <h2>Input files</h2>
@@ -47,24 +54,22 @@ GONE is downloaded separately from the official repository and placed in the
 
 <p>
 PSMC reconstructs changes in effective population size through time from the
-distribution of heterozygous sites in a single diploid genome.
+distribution of heterozygous sites along a diploid genome.
 </p>
 
 <hr>
 
 <h2>Step 1: Select high-coverage samples</h2>
 
-<p>
-Choose the highest-coverage individuals from each population using the coverage
-files generated during sequence processing.
-</p>
-
 <pre><code>ls stats/*.mean_coverage.txt
 </code></pre>
 
 <p>
-Example selected samples:
+Choose the highest-coverage individuals from each population. These samples
+provide the most reliable heterozygosity estimates for PSMC.
 </p>
+
+<p>Example selected samples:</p>
 
 <pre><code>K3
 K18
@@ -79,8 +84,8 @@ RR15
 <h3>What to expect</h3>
 
 <ul>
-  <li>Samples with the highest and most even coverage</li>
-  <li>These samples will be used for PSMC</li>
+  <li>A small set of high-quality individuals</li>
+  <li>These samples will be used for PSMC analysis</li>
 </ul>
 
 <hr>
@@ -98,8 +103,9 @@ vcfutils.pl vcf2fq -d 5 -D 100 > psmc/K3.fq
 </code></pre>
 
 <p>
-This converts the mapped BAM file into a diploid consensus FASTQ. Positions
-with very low or extremely high coverage are filtered out.
+This converts the mapped BAM file into a diploid consensus FASTQ sequence.
+Sites with very low coverage (<5) and extremely high coverage (>100) are
+filtered out.
 </p>
 
 <h3>What to expect</h3>
@@ -117,7 +123,8 @@ with very low or extremely high coverage are filtered out.
 </code></pre>
 
 <p>
-The consensus FASTQ is converted into the compressed PSMC input format.
+The consensus FASTQ is converted into the compressed PSMC input format that
+stores heterozygous and homozygous segments along the genome.
 </p>
 
 <h3>What to expect</h3>
@@ -164,7 +171,8 @@ done
 </code></pre>
 
 <p>
-Bootstrap replicates provide confidence around the demographic curve.
+Bootstrap replicates are used to evaluate the stability of the demographic
+curve by resampling genomic segments.
 </p>
 
 <h3>What to expect</h3>
@@ -242,7 +250,7 @@ bcftools view -S RR.list variants/variants.filtered.vcf.gz \
 </code></pre>
 
 <p>
-This creates separate SNP datasets for each population.
+This creates separate SNP datasets for each plateau population.
 </p>
 
 <h3>What to expect</h3>
@@ -258,7 +266,9 @@ This creates separate SNP datasets for each population.
 
 <h2>Step 3: Convert VCF to PLINK format</h2>
 
-<pre><code>plink --vcf variants/K.vcf.gz --make-bed --out gone/K
+<pre><code>mkdir -p gone
+
+plink --vcf variants/K.vcf.gz --make-bed --out gone/K
 plink --vcf variants/R.vcf.gz --make-bed --out gone/R
 plink --vcf variants/T.vcf.gz --make-bed --out gone/T
 plink --vcf variants/RR.vcf.gz --make-bed --out gone/RR
@@ -291,14 +301,15 @@ cd ..
 </code></pre>
 
 <p>
-GONE estimates recent effective population size for each plateau population.
+GONE estimates recent effective population size for each population using
+linkage disequilibrium among SNPs.
 </p>
 
 <h3>What to expect</h3>
 
 <ul>
-  <li>Ne estimates for each population</li>
-  <li>Recent demographic trends</li>
+  <li>Ne estimates for K, R, T and RR populations</li>
+  <li>Recent demographic trajectories</li>
 </ul>
 
 <hr>
