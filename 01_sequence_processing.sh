@@ -12,6 +12,7 @@
 # RR = Raireshwar
 # MEL = M. meltada
 
+
 #====================================================
 # Software installation
 #====================================================
@@ -263,10 +264,13 @@ variants/variants.qual20.vcf.gz \
 
 
 #====================================================
-# Final filtered SNP set
+# Remove SNPs with >20% missing data
 #====================================================
 
-cp variants/variants.mac3.vcf.gz variants/variants.filtered.vcf.gz
+bcftools +fill-tags variants/variants.mac3.vcf.gz -- -t F_MISSING | \
+bcftools view -i 'F_MISSING<0.2' \
+-Oz -o variants/variants.filtered.vcf.gz
+
 
 bcftools index variants/variants.filtered.vcf.gz
 
