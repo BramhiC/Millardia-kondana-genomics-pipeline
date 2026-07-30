@@ -20,9 +20,7 @@ This repository contains the analysis workflow to use for whole-genome populatio
 3. **Genetic diversity**
 4. **Inbreeding coefficient and runs of homozygosity**
 
-## Pipeline overview
-
-![Millardia kondana genomics pipeline](figures/mkondana_pipeline_flowchart.png)
+<img width="532" height="440" alt="image" src="https://github.com/user-attachments/assets/16264941-4e4c-49c2-ab8b-105be5fe9151" />
 
 ## Pipeline overview
 
