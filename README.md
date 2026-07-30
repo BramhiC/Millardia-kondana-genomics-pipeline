@@ -22,6 +22,10 @@ This repository contains the analysis workflow to use for whole-genome populatio
 
 ## Pipeline overview
 
+![Millardia kondana genomics pipeline](figures/mkondana_pipeline_flowchart.png)
+
+## Pipeline overview
+
 ```text
 Raw Illumina FASTQ files
         │
