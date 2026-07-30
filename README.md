@@ -20,8 +20,81 @@ This repository contains the analysis workflow to use for whole-genome populatio
 3. **Genetic diversity**
 4. **Inbreeding coefficient and runs of homozygosity**
 
-<img width="646" height="1200" alt="image" src="https://github.com/user-attachments/assets/7fcff8a4-9668-4cdf-a4d2-dce5e6084a01" />
+Raw Illumina FASTQ
+        |
+        v
+FastQC + MultiQC
+(Initial quality assessment)
+        |
+        v
+fastp
+(Adapter and quality trimming)
+        |
+        v
+BWA-MEM2
+(Map to Rattus rattus reference)
+        |
+        v
+SAMtools sort + index
+        |
+        v
+GATK MarkDuplicates
+        |
+        v
+SAMtools flagstat + depth
+(Coverage and mapping statistics)
+        |
+        v
+bcftools mpileup + call
+(Joint SNP calling)
+        |
+        v
+SNP filtering
+(QUAL, MAC, missingness)
+        |
+        v
++--------------------------------------------------+
+|         Final BAMs + Filtered VCF                |
++--------------------------------------------------+
+           /                              \
+          /                                \
+         v                                  v
 
+BAM branch (genotype likelihoods)     VCF branch (hard genotypes)
+---------------------------------------------------------------
+
+ANGSD                                PLINK
+   |                                    |
+   +--> PCAngsd (PCA)                   +--> GONE (recent Ne)
+   |
+   +--> NGSadmix (admixture)
+   |
+   +--> realSFS (pairwise FST)
+   |
+   +--> thetaStat (π, θW, Tajima's D)
+   |
+   +--> PSMC (historical Ne)
+   |
+   +--> ROHan (FROH, ROH)
+
+Filtered VCF
+   |
+   +--> FEIMS (gene flow)
+
+
+Final outputs
+-------------
+- PCA plots
+- Admixture plots
+- Pairwise FST matrix
+- Gene-flow network
+- Nucleotide diversity (π)
+- Watterson's θ
+- Tajima's D
+- Historical Ne trajectories
+- Recent Ne estimates
+- FROH values
+- ROH coordinates
 
 ## Pipeline overview
 
