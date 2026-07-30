@@ -11,9 +11,72 @@
 <h1>Millardia kondana Whole Genome Pipeline</h1>
 
 <p>
-Reference-guided whole genome analysis of four isolated plateau populations:
-Sinhagad, Rajgad, Torna and Raireshwar.
+Reference-guided whole genome analysis for a non-model, high-elevation rodent
+restricted to isolated lateritic plateaus in the northern Western Ghats.
 </p>
+
+<h2>Background</h2>
+
+<p>
+<em>Millardia kondana</em> is known from four geographically isolated plateau
+systems: Sinhagad, Rajgad, Torna and Raireshwar. Limited dispersal among these
+plateaus may have resulted in population isolation, reduced gene flow, loss of
+genetic diversity and increased inbreeding. The pipeline presented here is
+designed for whole-genome resequencing data from multiple populations of a
+non-model species lacking a species-specific reference genome.
+</p>
+
+<h2>Objectives</h2>
+
+<ol>
+  <li>Estimate current and historical effective population size</li>
+  <li>Assess gene flow and genetic differentiation among populations</li>
+  <li>Quantify genetic diversity within and among populations</li>
+  <li>Estimate genomic inbreeding and runs of homozygosity</li>
+</ol>
+
+<h2>Pipeline Overview</h2>
+
+<pre>
+FASTQ
+  ↓
+FastQC / MultiQC
+  ↓
+fastp
+  ↓
+BWA-MEM2
+  ↓
+SAMtools
+  ↓
+Picard
+  ↓
+Cleaned BAM files
+  ↓
+├── GONE (current Ne)
+├── PSMC (historical Ne)
+├── PCA / NGSadmix
+├── ANGSD (diversity)
+├── FST / gene flow
+└── ROHan (inbreeding)
+</pre>
+
+<h2>Software Used</h2>
+
+<ul>
+  <li>FastQC</li>
+  <li>MultiQC</li>
+  <li>fastp</li>
+  <li>BWA-MEM2</li>
+  <li>SAMtools</li>
+  <li>Picard</li>
+  <li>ANGSD</li>
+  <li>PCAngsd</li>
+  <li>NGSadmix</li>
+  <li>ROHan</li>
+  <li>PSMC</li>
+  <li>GONE</li>
+  <li>R / ggplot2</li>
+</ul>
 
 <h2>Navigation</h2>
 
@@ -24,23 +87,6 @@ Sinhagad, Rajgad, Torna and Raireshwar.
   <li><a href="04_genetic_diversity.html">Genetic Diversity</a></li>
   <li><a href="05_inbreeding.html">Inbreeding</a></li>
 </ul>
-
-<h2>Study Design</h2>
-
-<ul>
-  <li>M. kondana: 10 samples × 4 populations (40)</li>
-  <li>M. meltada: 10 samples</li>
-  <li>Total: 50 whole-genome samples</li>
-</ul>
-
-<h2>Objectives</h2>
-
-<ol>
-  <li>Current and historical effective population size</li>
-  <li>Gene flow and genetic differentiation among plateau populations</li>
-  <li>Genetic diversity</li>
-  <li>Inbreeding coefficient and runs of homozygosity</li>
-</ol>
 
 </body>
 </html>
