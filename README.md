@@ -20,64 +20,21 @@ This repository contains the analysis workflow to use for whole-genome populatio
 3. **Genetic diversity**
 4. **Inbreeding coefficient and runs of homozygosity**
 
-## Pipeline overview
-
-```text
-Raw Illumina FASTQ files
-        │
-        ▼
-Quality control
-(FastQC, MultiQC)
-        │
-        ▼
-Adapter and quality trimming
-(fastp)
-        │
-        ▼
-Read mapping to Rattus rattus reference
-(BWA-MEM2)
-        │
-        ▼
-BAM processing
-(SAMtools sort/index, GATK MarkDuplicates)
-        │
-        ▼
-Coverage and mapping statistics
-(SAMtools)
-        │
-        ▼
-Joint SNP calling
-(bcftools)
-        │
-        ▼
-Variant filtering
-(SNPs, QUAL, MAC, missingness)
-        │
-        ▼
-Final filtered VCF + deduplicated BAMs
-        │
-        ├───────────────┬────────────────┬─────────────────┬──────────────────┐
-        ▼               ▼                ▼                 ▼                  ▼
-Historical Ne       Recent Ne        Population        Genetic diversity    Inbreeding
-(PSMC)              (GONE)           structure & FST   (ANGSD)              (ROHan)
-                                        │
-                                        ▼
-                                   Gene flow
-                                     (FEIMS)
-```
 ## Software summary
 
-| Category | Software |
+| Step | Software |
 |---|---|
-| Quality control | FastQC, MultiQC, fastp |
+| Quality control | FastQC, MultiQC |
+| Adapter and quality trimming | fastp |
 | Read mapping | BWA-MEM2 |
-| BAM processing | SAMtools, GATK4 |
-| Variant calling | bcftools |
+| BAM sorting and indexing | SAMtools |
+| Duplicate marking | GATK4 MarkDuplicates |
+| Variant calling and filtering | bcftools |
 | Population structure | ANGSD, PCAngsd, NGSadmix |
 | Genetic differentiation | realSFS, FEIMS |
 | Genetic diversity | ANGSD, thetaStat |
-| Historical Ne | PSMC |
-| Recent Ne | GONE |
+| Historical effective population size | PSMC |
+| Recent effective population size | PLINK, GONE |
 | Inbreeding and ROH | ROHan |
 | Visualization | R (ggplot2, ComplexHeatmap) |
 | Optional QC | Qualimap, IGV |
