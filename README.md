@@ -20,7 +20,8 @@ This repository contains the analysis workflow to use for whole-genome populatio
 3. **Genetic diversity**
 4. **Inbreeding coefficient and runs of homozygosity**
 
-<img width="532" height="440" alt="image" src="https://github.com/user-attachments/assets/16264941-4e4c-49c2-ab8b-105be5fe9151" />
+<img width="646" height="1200" alt="image" src="https://github.com/user-attachments/assets/7fcff8a4-9668-4cdf-a4d2-dce5e6084a01" />
+
 
 ## Pipeline overview
 
