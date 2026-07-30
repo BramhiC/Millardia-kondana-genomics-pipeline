@@ -1,181 +1,128 @@
 #!/bin/bash
 
 #====================================================
-# Millardia kondana whole-genome sequencing pipeline
-# Historical and contemporary effective population size
+# Effective population size analyses
+# MSMC (primary) | PSMC (optional) | GONE (recent Ne)
 #====================================================
 
-# Historical Ne  : PSMC
-# Current Ne     : GONE
-
-
-#====================================================
-# Software installation
-#====================================================
-
-conda activate mkondana_wgs
-
-conda install -c bioconda psmc seqtk -y
+REF=reference/Rrattus.autosomes.fa
+VCF=variants/variants.filtered.vcf.gz
 
 
 #====================================================
-# Create directories
+# Coverage distribution
 #====================================================
 
-mkdir -p psmc
-mkdir -p gone
-
-
-#====================================================
-# Select high-coverage samples
-#====================================================
-
-# Choose the highest-coverage individuals from each population
-# based on stats/*.mean_coverage.txt
-
-ls stats/*.mean_coverage.txt
-
-
-# Example selected samples:
-# K3   K18
-# R7   R21
-# T5   T19
-# RR4  RR15
-
-
-#====================================================
-# Generate consensus FASTQ for PSMC
-#====================================================
-
-bcftools mpileup \
--f reference/Rrattus.fa \
--q 20 -Q 20 \
-bam/K3.dedup.bam | \
-bcftools call -c | \
-vcfutils.pl vcf2fq -d 5 -D 100 > psmc/K3.fq
-
-
-# -d 5   : minimum coverage
-# -D 100 : maximum coverage
-
-
-#====================================================
-# Convert FASTQ to PSMC format
-#====================================================
-
-fq2psmcfa -q20 psmc/K3.fq > psmc/K3.psmcfa
-
-
-#====================================================
-# Run PSMC
-#====================================================
-
-psmc -N25 -t15 -r5 -p "4+25*2+4+6" \
--o psmc/K3.psmc \
-psmc/K3.psmcfa
-
-
-#====================================================
-# Bootstrap analysis
-#====================================================
-
-splitfa psmc/K3.psmcfa > psmc/K3.split.psmcfa
-
-for i in {1..100}
+for sample in K1 K2 K3 K4
 do
-  seqtk sample -s$i psmc/K3.split.psmcfa 100 > psmc/bootstrap.$i.psmcfa
-
-  psmc -N25 -t15 -r5 -b -p "4+25*2+4+6" \
-  -o psmc/bootstrap.$i.psmc \
-  psmc/bootstrap.$i.psmcfa
+  samtools depth -a bam/${sample}.dedup.bam | \
+  awk '{print $3}' > stats/${sample}.depth.txt
 done
 
 
 #====================================================
-# Plot historical Ne
+# Consensus generation
 #====================================================
 
-psmc_plot.pl -u 2.5e-8 -g 0.5 psmc/K3 psmc/K3.psmc
-
-
-# -u : mutation rate per site per generation
-# -g : generation time (years)
-
-
-# Repeat the same workflow for:
-# K18 R7 R21 T5 T19 RR4 RR15
+for sample in K1 K2 K3 K4
+do
+  samtools mpileup -C50 -uf ${REF} bam/${sample}.dedup.bam | \
+  bcftools call -c | \
+  vcfutils.pl vcf2fq -d 10 -D 60 > ${sample}.fq
+done
 
 
 #====================================================
-# Contemporary effective population size (GONE)
+# MSMC input
 #====================================================
 
-# Create population sample lists
-
-grep "Sinhagad" metadata/sample_metadata.tsv | cut -f1 > K.list
-grep "Rajgad" metadata/sample_metadata.tsv | cut -f1 > R.list
-grep "Torna" metadata/sample_metadata.tsv | cut -f1 > T.list
-grep "Raireshwar" metadata/sample_metadata.tsv | cut -f1 > RR.list
+for sample in K1 K2 K3 K4
+do
+  generate_multihetsep.py ${sample}.fq > ${sample}.multihetsep.txt
+done
 
 
 #====================================================
-# Extract population-specific VCFs
+# MSMC
 #====================================================
 
-bcftools view -S K.list variants/variants.filtered.vcf.gz \
--Oz -o variants/K.vcf.gz
-
-bcftools view -S R.list variants/variants.filtered.vcf.gz \
--Oz -o variants/R.vcf.gz
-
-bcftools view -S T.list variants/variants.filtered.vcf.gz \
--Oz -o variants/T.vcf.gz
-
-bcftools view -S RR.list variants/variants.filtered.vcf.gz \
--Oz -o variants/RR.vcf.gz
+msmc2 \
+-I 0,1,2,3 \
+-o K_MSMC \
+K1.multihetsep.txt \
+K2.multihetsep.txt \
+K3.multihetsep.txt \
+K4.multihetsep.txt
 
 
 #====================================================
-# Convert VCF to PLINK format
+# Sensitivity analysis
 #====================================================
 
-plink --vcf variants/K.vcf.gz --make-bed --out gone/K
-plink --vcf variants/R.vcf.gz --make-bed --out gone/R
-plink --vcf variants/T.vcf.gz --make-bed --out gone/T
-plink --vcf variants/RR.vcf.gz --make-bed --out gone/RR
+msmc2 -t 8 -I 0,1,2,3 -o K_MSMC_t8 \
+K1.multihetsep.txt K2.multihetsep.txt K3.multihetsep.txt K4.multihetsep.txt
 
-
-# --make-bed creates:
-# .bed : binary genotypes
-# .bim : SNP information
-# .fam : sample information
+msmc2 -t 16 -I 0,1,2,3 -o K_MSMC_t16 \
+K1.multihetsep.txt K2.multihetsep.txt K3.multihetsep.txt K4.multihetsep.txt
 
 
 #====================================================
-# Run GONE
+# Optional PSMC
 #====================================================
 
-cd gone
+fq2psmcfa -q20 K1.fq > K1.psmcfa
 
-bash script_GONE.sh K
-bash script_GONE.sh R
-bash script_GONE.sh T
-bash script_GONE.sh RR
-
-cd ..
+psmc -N25 -t15 -r5 -p "4+25*2+4+6" \
+-o K1.psmc K1.psmcfa
 
 
 #====================================================
-# Final outputs
+# GONE: Sinhagad
 #====================================================
 
-# Historical Ne:
-# psmc/*.psmc
-# psmc/*.pdf
-# psmc/*.png
+bcftools view -S metadata/sinhagad.samples ${VCF} -Oz -o K.filtered.vcf.gz
 
-# Contemporary Ne:
-# gone/K*
-# gone/R*
-# gone/T*
-# gone/RR*
+plink --vcf K.filtered.vcf.gz \
+      --make-bed \
+      --out K_population
+
+GONE K_population
+
+
+#====================================================
+# GONE: Rajgad
+#====================================================
+
+bcftools view -S metadata/rajgad.samples ${VCF} -Oz -o R.filtered.vcf.gz
+
+plink --vcf R.filtered.vcf.gz \
+      --make-bed \
+      --out R_population
+
+GONE R_population
+
+
+#====================================================
+# GONE: Torna
+#====================================================
+
+bcftools view -S metadata/torna.samples ${VCF} -Oz -o T.filtered.vcf.gz
+
+plink --vcf T.filtered.vcf.gz \
+      --make-bed \
+      --out T_population
+
+GONE T_population
+
+
+#====================================================
+# GONE: Raireshwar
+#====================================================
+
+bcftools view -S metadata/raireshwar.samples ${VCF} -Oz -o RR.filtered.vcf.gz
+
+plink --vcf RR.filtered.vcf.gz \
+      --make-bed \
+      --out RR_population
+
+GONE RR_population
