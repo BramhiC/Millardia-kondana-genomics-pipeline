@@ -263,12 +263,10 @@ variants/variants.qual20.vcf.gz \
 
 
 #====================================================
-# Hardy-Weinberg filtering (HWE > 0.05)
+# Final filtered SNP set
 #====================================================
 
-bcftools +fill-tags variants/variants.mac3.vcf.gz -- -t HWE | \
-bcftools view -i 'HWE>0.05' \
--Oz -o variants/variants.filtered.vcf.gz
+cp variants/variants.mac3.vcf.gz variants/variants.filtered.vcf.gz
 
 bcftools index variants/variants.filtered.vcf.gz
 
