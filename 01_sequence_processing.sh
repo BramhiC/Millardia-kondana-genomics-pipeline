@@ -1,15 +1,34 @@
+Yes. Your first page should also be made more compact and lab-style.
+
+I removed:
+
+* tutorial-style explanations,
+
+* “expected outputs” prose,
+
+* long descriptive comments,
+
+* AI-sounding sentences.
+
+I kept only:
+
+* section headers,
+
+* essential notes,
+
+* commands.
+
+Here is the cleaned `01_sequence_processing.sh` in the same style as the revised Page 2.
+
+Bash
+
+```
 #!/bin/bash
 
 #====================================================
 # Millardia kondana whole-genome population genomics
-# Reference-based mapping using Rattus rattus genome
+# Reference-based mapping using Rattus rattus
 #====================================================
-
-
-#----------------------------------------------------
-# Configuration
-# Replace placeholder values before running
-#----------------------------------------------------
 
 REF=reference/Rrattus.fa
 
@@ -22,19 +41,8 @@ MIN_MAC=<MINOR_ALLELE_COUNT>
 MAX_MISSING=<MISSINGNESS_THRESHOLD>
 
 
-#----------------------------------------------------
-# Populations
-#----------------------------------------------------
-
-# K   = Sinhagad
-# R   = Rajgad
-# T   = Torna
-# RR  = Raireshwar
-# MEL = Millardia meltada
-
-
 #====================================================
-# Software installation
+# Software
 #====================================================
 
 conda create -n mkondana_wgs -y
@@ -46,7 +54,7 @@ plink qualimap -y
 
 
 #====================================================
-# Create project structure
+# Directories
 #====================================================
 
 mkdir -p raw_fastq
@@ -65,7 +73,7 @@ mkdir -p metadata
 
 
 #====================================================
-# Quality control of raw reads
+# FastQC: raw reads
 #====================================================
 
 fastqc raw_fastq/*.fastq.gz -o fastqc_raw -t ${THREADS}
@@ -74,7 +82,7 @@ multiqc fastqc_raw -o multiqc_raw
 
 
 #====================================================
-# Adapter and quality trimming
+# fastp
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -92,7 +100,7 @@ done
 
 
 #====================================================
-# Quality control after trimming
+# FastQC: trimmed reads
 #====================================================
 
 fastqc trimmed/*.fastq.gz -o fastqc_trimmed -t ${THREADS}
@@ -101,7 +109,7 @@ multiqc fastqc_trimmed -o multiqc_trimmed
 
 
 #====================================================
-# Prepare reference genome (Rattus rattus)
+# Reference
 #====================================================
 
 bwa-mem2 index ${REF}
@@ -114,7 +122,7 @@ gatk CreateSequenceDictionary \
 
 
 #====================================================
-# Read mapping
+# BWA-MEM2
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -129,7 +137,7 @@ done
 
 
 #====================================================
-# Convert SAM to sorted BAM
+# SAM -> sorted BAM
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -143,7 +151,7 @@ done
 
 
 #====================================================
-# Mark PCR duplicates
+# Mark duplicates
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -170,7 +178,7 @@ done
 
 
 #====================================================
-# Mean sequencing coverage
+# Mean coverage
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -182,7 +190,7 @@ done
 
 
 #====================================================
-# Qualimap alignment assessment
+# Qualimap
 #====================================================
 
 for sample in K1 K2 K3 R1 R2 T1 T2 RR1 RR2 MEL1
@@ -195,14 +203,14 @@ done
 
 
 #====================================================
-# Create BAM list for downstream analyses
+# BAM list
 #====================================================
 
 ls bam/*.dedup.bam > bamlist.txt
 
 
 #====================================================
-# Joint variant calling
+# Variant calling
 #====================================================
 
 bcftools mpileup \
@@ -220,7 +228,7 @@ bcftools index variants/variants.raw.vcf.gz
 
 
 #====================================================
-# Retain SNPs only
+# SNPs only
 #====================================================
 
 bcftools view -v snps \
@@ -229,7 +237,7 @@ variants/variants.raw.vcf.gz \
 
 
 #====================================================
-# Filter by variant quality
+# QUAL filter
 #====================================================
 
 bcftools filter -i "QUAL>${MIN_QUAL}" \
@@ -238,7 +246,7 @@ variants/variants.snps.vcf.gz \
 
 
 #====================================================
-# Remove rare variants
+# MAC filter
 #====================================================
 
 bcftools view -i "MAC>${MIN_MAC}" \
@@ -247,7 +255,7 @@ variants/variants.qual.vcf.gz \
 
 
 #====================================================
-# Remove SNPs with excessive missing data
+# Missingness filter
 #====================================================
 
 bcftools +fill-tags variants/variants.mac.vcf.gz -- -t F_MISSING | \
@@ -258,40 +266,10 @@ bcftools index variants/variants.filtered.vcf.gz
 
 
 #====================================================
-# Prepare autosomal reference for PSMC / MSMC
-# Remove mitochondrial and sex-chromosome scaffolds
+# Autosomal reference for MSMC / PSMC
 #====================================================
 
 grep -v -E "chrX|chrY|MT|M|mitochond" ${REF}.fai | cut -f1 > autosomes.list
 
 samtools faidx ${REF} $(cat autosomes.list) > reference/Rrattus.autosomes.fa
-
-
-#====================================================
-# Notes for demographic analyses
-#====================================================
-
-# - PSMC should be run on high-quality individuals with adequate coverage.
-# - Minimum depth for PSMC consensus generation should be ≥10×.
-# - Exact depth thresholds should be chosen after inspecting coverage distribution.
-# - Sensitivity analysis can be performed using alternative -t and -p values.
-# - If multiple high-quality phased genomes are available, MSMC can be evaluated
-#   as an alternative or complementary approach to PSMC.
-
-
-#====================================================
-# Final outputs
-#====================================================
-
-# Clean BAM files:
-# bam/*.dedup.bam
-
-# Final filtered SNPs:
-# variants/variants.filtered.vcf.gz
-
-# QC reports:
-# multiqc_raw/multiqc_report.html
-# multiqc_trimmed/multiqc_report.html
-
-# Alignment QC:
-# qualimap/*/genome_results.txt
+```
