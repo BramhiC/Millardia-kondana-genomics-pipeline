@@ -5,8 +5,7 @@ Population genetics pipeline for M.kondana
 This repository contains the analysis workflow to use for whole-genome population genomics of the endangered Kondana soft-furred rat (*Millardia kondana*) across four isolated high-elevation plateau populations in the northern Western Ghats, India.
 
 ---
-
-## Study system
+## Study populations
 
 - **K** — Sinhagad
 - **R** — Rajgad
@@ -14,179 +13,88 @@ This repository contains the analysis workflow to use for whole-genome populatio
 - **RR** — Raireshwar
 - **MEL** — *Millardia meltada* (comparative population)
 
-Once Illumina whole-genome sequencing data is generated for all individuals. Because no reference genome is currently available for *M. kondana*, reads will be mapped to the **Rattus rattus** reference genome.
-
----
-
-## Analysis objectives
+- ## Analysis objectives
 
 1. **Current and historical effective population size**
 2. **Gene flow and genetic differentiation between populations**
 3. **Genetic diversity**
 4. **Inbreeding coefficient and runs of homozygosity**
 
----
-
-# Pipeline overview
+## Pipeline overview
 
 ```text
-Raw FASTQ
-   ↓
-fastp
-   ↓
-FastQC / MultiQC
-   ↓
-BWA-MEM2
-   ↓
-SAMtools sort/index
-   ↓
-GATK MarkDuplicates
-   ↓
-bcftools variant calling
-   ↓
-SNP filtering (QUAL, MAC, missingness)
-   ↓
-Final filtered VCF
+Raw Illumina FASTQ files
+        │
+        ▼
+Quality control
+(FastQC, MultiQC)
+        │
+        ▼
+Adapter and quality trimming
+(fastp)
+        │
+        ▼
+Read mapping to Rattus rattus reference
+(BWA-MEM2)
+        │
+        ▼
+BAM processing
+(SAMtools sort/index, GATK MarkDuplicates)
+        │
+        ▼
+Coverage and mapping statistics
+(SAMtools)
+        │
+        ▼
+Joint SNP calling
+(bcftools)
+        │
+        ▼
+Variant filtering
+(SNPs, QUAL, MAC, missingness)
+        │
+        ▼
+Final filtered VCF + deduplicated BAMs
+        │
+        ├───────────────┬────────────────┬─────────────────┬──────────────────┐
+        ▼               ▼                ▼                 ▼                  ▼
+Historical Ne       Recent Ne        Population        Genetic diversity    Inbreeding
+(PSMC)              (GONE)           structure & FST   (ANGSD)              (ROHan)
+                                        │
+                                        ▼
+                                   Gene flow
+                                     (FEIMS)
 ```
+## Software summary
 
----
+| Category | Software |
+|---|---|
+| Quality control | FastQC, MultiQC, fastp |
+| Read mapping | BWA-MEM2 |
+| BAM processing | SAMtools, GATK4 |
+| Variant calling | bcftools |
+| Population structure | ANGSD, PCAngsd, NGSadmix |
+| Genetic differentiation | realSFS, FEIMS |
+| Genetic diversity | ANGSD, thetaStat |
+| Historical Ne | PSMC |
+| Recent Ne | GONE |
+| Inbreeding and ROH | ROHan |
+| Visualization | R (ggplot2, ComplexHeatmap) |
+| Optional QC | Qualimap, IGV |
 
-# Repository structure
+## Script descriptions
 
-```text
-.
-├── README.md
-├── 01_sequence_processing.sh
-├── 02_effective_population_size.sh
-├── 03_population_structure_gene_flow.sh
-├── 04_genetic_diversity.sh
-├── 05_inbreeding_rohan.sh
-├── reference/
-├── metadata/
-├── scripts/
-└── results/
-```
+### 01_sequence_processing.sh
+Quality control, adapter trimming, mapping to the *Rattus rattus* reference genome, BAM processing, joint SNP calling, and variant filtering.
 
----
+### 02_effective_population_size.sh
+Historical effective population size using PSMC and recent effective population size using GONE.
 
-# Step 1 — Sequence processing
+### 03_population_structure_gene_flow.sh
+Population structure using PCAngsd and NGSadmix, pairwise FST estimation using ANGSD/realSFS, and gene-flow analysis using FEIMS.
 
-**File:** `01_sequence_processing.sh`
+### 04_genetic_diversity.sh
+Estimation of nucleotide diversity (π), Watterson’s θ, Tajima’s D, and sliding-window diversity statistics using ANGSD.
 
-### Main software
-
-- fastp
-- FastQC
-- MultiQC
-- BWA-MEM2
-- SAMtools
-- GATK4
-- bcftools
-
-### Output
-
-- Deduplicated BAM files
-- Filtered SNP VCF
-
-### Filtering
-
-- SNPs only
-- QUAL > 20
-- MAC > 3
-- Missingness < 20%
-
----
-
-# Step 2 — Effective population size
-
-**File:** `02_effective_population_size.sh`
-
-### Historical Ne
-
-- PSMC
-- seqtk
-- bcftools
-
-### Contemporary Ne
-
-- GONE
-- PLINK
-
-### Output
-
-- PSMC demographic trajectories
-- Recent Ne estimates for K, R, T and RR
-
----
-
-# Step 3 — Population structure and gene flow
-
-**File:** `03_population_structure_gene_flow.sh`
-
-### Population structure
-
-- ANGSD
-- PCAngsd
-- NGSadmix
-
-### Genetic differentiation
-
-- ANGSD
-- realSFS
-
-### Gene flow
-
-- FEIMS
-
-### Output
-
-- PCA
-- Admixture plots
-- Pairwise FST
-- Gene-flow network
-
----
-
-# Step 4 — Genetic diversity
-
-**File:** `04_genetic_diversity.sh`
-
-### Software
-
-- ANGSD
-- realSFS
-- thetaStat
-
-### Statistics
-
-- Nucleotide diversity (π)
-- Watterson’s θ
-- Tajima’s D
-- Sliding-window diversity
-
-### Comparative analysis
-
-- *M. kondana* vs *M. meltada*
-
----
-
-# Step 5 — Inbreeding and ROH
-
-**File:** `05_inbreeding_rohan.sh`
-
-### Software
-
-- ROHan
-
-### Statistics
-
-- FROH
-- ROH coordinates
-- Local heterozygosity
-
-### Output
-
-- Genome-wide inbreeding coefficients
-- ROH BED files
-- Window-based heterozygosity
-
+### 05_inbreeding_rohan.sh
+Estimation of genome-wide inbreeding coefficient (FROH), runs of homozygosity (ROH), and local heterozygosity using ROHan.
